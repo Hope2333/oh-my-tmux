@@ -25,7 +25,7 @@ curl -fsSL "https://github.com/Hope2333/oh-my-tmux/raw/refs/heads/main/install.s
 ### Manual Install
 
 ```bash
-# 1. Clone the lite branch
+# 1. Clone the desired theme branch
 git clone -b lite --depth=1 https://github.com/Hope2333/oh-my-tmux.git ~/.local/share/tmux/oh-my-tmux
 
 # 2. Create symlink (XDG config style)
@@ -38,6 +38,16 @@ cp ~/.local/share/tmux/oh-my-tmux/.tmux.conf.local ~/.config/tmux/tmux.conf.loca
 # 4. Start tmux
 tmux
 ```
+
+### Available Themes
+
+| Branch | Preview | Description |
+|---|---|---|
+| `lite` | 🌑 Default Dark | Original dark theme with light blue accents |
+| `arc-dark` | 🌃 Arc-Dark | Dark theme with Arc GTK colors (#383c4a bg, #5294e2 blue) |
+| `arc-light` | ☀️ Arc-Light | Light theme with Arc GTK colors (#f5f6f7 bg, #5294e2 blue) |
+
+To install a specific theme, replace `-b lite` with `-b arc-dark` or `-b arc-light` in the clone command above.
 
 ### Requirements
 
