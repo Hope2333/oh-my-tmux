@@ -269,7 +269,7 @@ tmux_conf_theme_right_separator_sub="|"
 #     - #{username_ssh}
 tmux_conf_theme_status_left=" ❐ #S | ↑#{?uptime_y, #{uptime_y}y,}#{?uptime_d, #{uptime_d}d,}#{?uptime_h, #{uptime_h}h,}#{?uptime_m, #{uptime_m}m,} "
 #tmux_conf_theme_status_left=" ❐ #S | ↑#{?uptime_y, #{uptime_y}y,}#{?uptime_d, #{uptime_d}d,}#{?uptime_h, #{uptime_h}h,}#{?uptime_m, #{uptime_m}m,} | #{pretty_pane_current_path} "
-tmux_conf_theme_status_right=" #{prefix}#{mouse}#{pairing}#{synchronized}#{?battery_status,#{battery_status},}#{?battery_bar, #{battery_bar},}#{?battery_percentage, #{battery_percentage},} , %R , %d %b | #[fg=#8b949e,bg=#2f343f]#{@omt_username}#[fg=#d70000,bg=#2f343f,bold]#{@omt_root}#[fg=#ffffff,bg=#3b72c8] #{@omt_hostname} #[default]"
+tmux_conf_theme_status_right=" #{prefix}#{mouse}#{pairing}#{synchronized}#{?battery_status,#{?battery_percentage,#{?#{<:#{@battery_charge},0.18},#[fg=#d70000],#[fg=#5294e2]}#{battery_percentage}},},} , %R , %d %b | #[fg=#8b949e,bg=#2f343f]#{@omt_username} #[fg=#d70000,bg=#2f343f,bold]#{@omt_root}#[fg=#ffffff,bg=#3b72c8] #{@omt_hostname} #[default]"
 
 # status left style (ArcGlass-Dark: dark panel with blue accent)
 tmux_conf_theme_status_left_fg="$tmux_conf_theme_colour_7,$tmux_conf_theme_colour_4,$tmux_conf_theme_colour_3"
