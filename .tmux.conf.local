@@ -127,7 +127,7 @@ tmux_conf_theme_colour_17="#d3dae3"   # light text
 tmux_conf_theme_window_fg="#d3dae3"
 tmux_conf_theme_window_bg="default"
 
-# highlight focused pane (subtle border only)
+# highlight focused pane
 tmux_conf_theme_highlight_focused_pane=false
 
 # focused pane colours:
