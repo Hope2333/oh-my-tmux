@@ -46,6 +46,8 @@ tmux
 | `lite` | 🌑 Default Dark | Original dark theme with light blue accents |
 | `arc-dark` | 🌃 Arc-Dark | Dark theme with Arc GTK colors (#383c4a bg, #5294e2 blue) |
 | `arc-light` | ☀️ Arc-Light | Light theme with Arc GTK colors (#f5f6f7 bg, #5294e2 blue) |
+| `arc-glass-dark` | 🪟 ArcGlass-Dark | **Transparent** dark theme, status bar only (#5294e2 blue) |
+| `arc-glass-light` | 🪟 ArcGlass-Light | **Transparent** light theme, status bar only (#5294e2 blue) |
 
 To install a specific theme, replace `-b lite` with `-b arc-dark` or `-b arc-light` in the clone command above.
 
