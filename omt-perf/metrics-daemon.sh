@@ -38,6 +38,14 @@ while [ "$("$tmux_bin" "${socket_args[@]}" display-message -p '#{pid}' 2>/dev/nu
 		sh "$omt_sh" _battery_info >/dev/null 2>&1 || true
 		sh "$omt_sh" _uptime >/dev/null 2>&1 || true
 		battery_charge="$("$tmux_bin" "${socket_args[@]}" show-option -gv @battery_charge 2>/dev/null || true)"
+		battery_pct="$("$tmux_bin" "${socket_args[@]}" show-option -gv @battery_percentage 2>/dev/null || true)"
+		if [ -n "$battery_charge" ] && [ -n "$battery_pct" ]; then
+			if (($(echo "$battery_charge < 0.18" | bc -l 2>/dev/null || echo 0))); then
+				"$tmux_bin" "${socket_args[@]}" set-option -g @omt_battery_pct "#[fg=#d70000]${battery_pct}"
+			else
+				"$tmux_bin" "${socket_args[@]}" set-option -g @omt_battery_pct "#[fg=#5294e2]${battery_pct}"
+			fi
+		fi
 		if [ -n "$battery_charge" ] && [ -x "$battery_worker" ]; then
 			while IFS= read -r width; do
 				[ -n "$width" ] || continue
