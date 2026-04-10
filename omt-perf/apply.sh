@@ -114,6 +114,9 @@ main() {
 	"$HOME/.config/tmux/omt-perf/refresh-client-panes.sh"
 
 	$tmux_bin "${socket_args[@]}" set-option -g mouse on
+
+	# ArcGlass: transparent pane background
+	$tmux_bin "${socket_args[@]}" setw -g window-active-style "fg=default,bg=default"
 }
 
 main "$@"
