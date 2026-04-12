@@ -59,9 +59,9 @@ def repl(m: re.Match) -> str:
 
 sr = pat.sub(repl, sr)
 
-sr = re.sub(r"#\(echo;\s*nice\s+sh\s+'[^']+'\s+_battery_status\s+'↑'\s+'↓'\)", "", sr)
+sr = re.sub(r"#\(echo;\s*nice\s+(?:cut\s+-c3-\s+'[^']+'\s*\|\s*sh\s+-s\s+_battery_status|sh\s+'[^']+'\s+_battery_status)\s+'[^']*'\s+'[^']*'\)", "", sr)
 sr = re.sub(
-	r"#\{\?@battery_percentage.*?#\(\s*nice\s+sh\s+'[^']+'\s+_bar\s+'[^']+'\s+'◻'\s+'◼'\s+'auto'\s+'#\{@battery_charge\}'\s+'#\{client_width\}'\)",
+	r"#\{\?@battery_percentage.*?#\(\s*(?:nice\s+)?(?:cut\s+-c3-\s+'[^']+'\s*\|\s*sh\s+-s\s+_bar|sh\s+'[^']+'\s+_bar)\s+'[^']*'\s+'[^']*'\s+'[^']*'\s+'[^']*'\s+'#\{@battery_charge\}'\s+'#\{client_width\}'\)",
 	"#{?@battery_percentage, #(sh '#{E:HOME}/.config/tmux/omt-perf/battery-bar-worker.sh' '#{@battery_charge}' '#{client_width}')",
 	sr,
 )
@@ -98,8 +98,10 @@ start_metrics_daemon() {
 }
 
 stop_legacy_loops() {
-	pkill -f "cut -c3- '$tmux_conf' | sh -s _battery_info" >/dev/null 2>&1 || true
-	pkill -f "cut -c3- '$tmux_conf' | sh -s _uptime" >/dev/null 2>&1 || true
+	pkill -f "sh -s _battery_info" >/dev/null 2>&1 || true
+	pkill -f "sh -s _uptime" >/dev/null 2>&1 || true
+	pkill -f "cut -c3-.*_battery_info" >/dev/null 2>&1 || true
+	pkill -f "cut -c3-.*_uptime" >/dev/null 2>&1 || true
 }
 
 main() {
