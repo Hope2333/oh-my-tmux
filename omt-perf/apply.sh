@@ -59,10 +59,19 @@ def repl(m: re.Match) -> str:
 
 sr = pat.sub(repl, sr)
 
-sr = re.sub(r"#\(echo;\s*nice\s+sh\s+'[^']+'\s+_battery_status\s+'↑'\s+'↓'\)", "", sr)
 sr = re.sub(
-	r"#\{\?@battery_percentage,\s*#\(nice\s+sh\s+'[^']+'\s+_bar\s+'gradient'\s+'◻'\s+'◼'\s+'auto'\s+'#\{@battery_charge\}'\s+'#\{client_width\}'\),\}",
-	"#{?@battery_percentage, #(sh '#{E:HOME}/.config/tmux/omt-perf/battery-bar-worker.sh' '#{@battery_charge}' '#{client_width}'),}",
+	r"#\(echo;\s*(?:nice\s+)?sh\s+'[^']+'\s+_battery_status\s+'[^']*'\s+'[^']*'\)",
+	"",
+	sr,
+)
+sr = re.sub(
+	r"#\{\?@battery_percentage,\s*#\((?:nice\s+)?sh\s+'[^']+'\s+_(?:bar|hbar|vbar)\s+[^)]*\),\}",
+	"",
+	sr,
+)
+sr = re.sub(
+	r"#\{\?@battery_percentage,\s*#\(sh\s+'#\{E:HOME\}/\.config/tmux/omt-perf/battery-bar-worker\.sh'\s+[^)]*\),\}",
+	"",
 	sr,
 )
 
@@ -98,8 +107,18 @@ start_metrics_daemon() {
 }
 
 stop_legacy_loops() {
-	pkill -f "cut -c3- '$tmux_conf' | sh -s _battery_info" >/dev/null 2>&1 || true
-	pkill -f "cut -c3- '$tmux_conf' | sh -s _uptime" >/dev/null 2>&1 || true
+	local server_pid pid ppid args
+	server_pid="$($tmux_bin "${socket_args[@]}" display-message -p '#{pid}' 2>/dev/null || true)"
+	[ -n "$server_pid" ] || return 0
+
+	ps -eo pid=,ppid=,args= | while read -r pid ppid args; do
+		[ "$ppid" = "$server_pid" ] || continue
+		case "$args" in
+		*"cut -c3-"*"_battery_info"* | *"cut -c3-"*"_uptime"* | *"cut -c3-"*"_battery_status"* | *"cut -c3-"*"_bar"*)
+			kill "$pid" >/dev/null 2>&1 || true
+			;;
+		esac
+	done
 }
 
 main() {

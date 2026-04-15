@@ -12,4 +12,4 @@ If you only need script responsibilities quickly:
 - `update-pane-cache.sh`: ssh-aware identity cache (pane-scoped)
 - `refresh-client-panes.sh`: refresh active panes for clients
 - `metrics-daemon.sh`: low-frequency metrics + cache prewarm
-- `battery-bar-worker.sh`: cache-first battery bar worker
+- `battery-bar-worker.sh`: legacy cache-first battery bar worker for local overrides
