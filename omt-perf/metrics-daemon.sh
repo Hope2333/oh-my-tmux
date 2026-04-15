@@ -29,29 +29,31 @@ fi
 
 tmux_conf="${TMUX_CONF:-$HOME/.config/tmux/tmux.conf}"
 omt_sh="${XDG_CACHE_HOME:-$HOME/.cache}/tmux/omt.sh"
-battery_worker="$HOME/.config/tmux/omt-perf/battery-bar-worker.sh"
 metrics_interval_sec="${OMT_METRICS_INTERVAL_SEC:-75}"
-width_stagger_sec="${OMT_WIDTH_STAGGER_SEC:-0.03}"
 
 while [ "$("$tmux_bin" "${socket_args[@]}" display-message -p '#{pid}' 2>/dev/null || true)" != "" ]; do
 	if [ -x "$omt_sh" ]; then
 		sh "$omt_sh" _battery_info >/dev/null 2>&1 || true
+		sh "$omt_sh" _battery_status "↑" "↓" >/dev/null 2>&1 || true
 		sh "$omt_sh" _uptime >/dev/null 2>&1 || true
 		battery_charge="$("$tmux_bin" "${socket_args[@]}" show-option -gv @battery_charge 2>/dev/null || true)"
+		battery_status="$("$tmux_bin" "${socket_args[@]}" show-option -gv @battery_status 2>/dev/null || true)"
 		battery_pct="$("$tmux_bin" "${socket_args[@]}" show-option -gv @battery_percentage 2>/dev/null || true)"
+		if [ -n "$battery_status" ]; then
+			"$tmux_bin" "${socket_args[@]}" set-option -g @omt_battery_status "$battery_status"
+		else
+			"$tmux_bin" "${socket_args[@]}" set-option -gu @omt_battery_status >/dev/null 2>&1 || true
+		fi
 		if [ -n "$battery_charge" ] && [ -n "$battery_pct" ]; then
 			if (($(echo "$battery_charge < 0.18" | bc -l 2>/dev/null || echo 0))); then
 				"$tmux_bin" "${socket_args[@]}" set-option -g @omt_battery_pct "#[fg=#d70000]${battery_pct}"
 			else
 				"$tmux_bin" "${socket_args[@]}" set-option -g @omt_battery_pct "#[fg=#5294e2]${battery_pct}"
 			fi
-		fi
-		if [ -n "$battery_charge" ] && [ -x "$battery_worker" ]; then
-			while IFS= read -r width; do
-				[ -n "$width" ] || continue
-				sh "$battery_worker" "$battery_charge" "$width" >/dev/null 2>&1 || true
-				sleep "$width_stagger_sec"
-			done < <("$tmux_bin" "${socket_args[@]}" list-clients -F '#{client_width}' | sort -u)
+		elif [ -n "$battery_pct" ]; then
+			"$tmux_bin" "${socket_args[@]}" set-option -g @omt_battery_pct "$battery_pct"
+		else
+			"$tmux_bin" "${socket_args[@]}" set-option -gu @omt_battery_pct >/dev/null 2>&1 || true
 		fi
 	fi
 	sleep "$metrics_interval_sec"
