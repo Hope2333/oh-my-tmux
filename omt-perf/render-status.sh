@@ -182,6 +182,8 @@ battery_pct="$(tmux_get @battery_percentage)"
 omt_username="$(tmux_msg '#{@omt_username}')"
 omt_root="$(tmux_msg '#{@omt_root}')"
 omt_hostname="$(tmux_msg '#{?@omt_hostname,#{@omt_hostname},#h}')"
+session_name="$(tmux_msg '#S')"
+session_count="$("$tmux_bin" "${socket_args[@]}" list-sessions 2>/dev/null | wc -l | awk '{print $1}' || true)"
 
 bar_palette="$(value_get @omt_battery_bar_palette)"
 bar_low_palette="$(value_get @omt_battery_bar_low_palette)"
@@ -196,16 +198,24 @@ bar_full="$(value_get @omt_battery_bar_symbol_full)"
 [ -n "$bar_full" ] || bar_full="◼"
 [ -n "$omt_hostname" ] || omt_hostname="$(hostname -s 2>/dev/null || hostname 2>/dev/null || printf '<none>')"
 [ -n "$omt_username" ] || omt_username="$(id -un 2>/dev/null || printf '')"
+[ -n "$session_name" ] || session_name="$("$tmux_bin" "${socket_args[@]}" list-sessions -F '#{session_name}' 2>/dev/null | sed -n '1p' || true)"
+[ -n "$session_name" ] || session_name="S"
+[ -n "$session_count" ] || session_count="1"
+if [ "$session_count" = "0" ]; then
+	session_count="1"
+fi
 
 show_pct=1
 show_user=1
 show_date=1
 show_bar=1
 show_status=1
+show_session=0
 show_host=1
 mode_name="full"
 render_length="$bar_length"
 host_display="$omt_hostname"
+session_display="$session_name"
 
 if [ "$width" -lt "$micro_under" ]; then
 	mode_name="micro"
@@ -214,7 +224,9 @@ if [ "$width" -lt "$micro_under" ]; then
 	show_date=0
 	show_bar=0
 	show_status=0
+	show_session=1
 	show_host=0
+	session_display="$(truncate_ascii "$session_name" 4)"
 elif [ "$width" -lt "$compact_under" ]; then
 	mode_name="compact"
 	show_pct=0
@@ -222,7 +234,13 @@ elif [ "$width" -lt "$compact_under" ]; then
 	show_date=0
 	show_bar=0
 	show_status=0
-	host_display="$(truncate_ascii "$omt_hostname" 8)"
+	show_session=1
+	session_display="$(truncate_ascii "$session_name" 6)"
+	if [ "$width" -ge 72 ]; then
+		host_display="$(truncate_ascii "$omt_hostname" 6)"
+	else
+		show_host=0
+	fi
 fi
 
 if [ "$width" -lt "$pct_under" ]; then
@@ -270,6 +288,9 @@ preview="${preview}${preview:+ }| ${time_now}"
 if [ "$show_date" -eq 1 ]; then
 	preview="${preview} | ${date_now}"
 fi
+if [ "$show_session" -eq 1 ] && [ -n "$session_display" ]; then
+	preview="${preview} | ${session_display}"
+fi
 if [ "$show_user" -eq 1 ] && [ -n "$omt_username" ]; then
 	preview="${preview} | ${omt_username}${omt_root}"
 fi
@@ -284,10 +305,14 @@ printf 'show_date=%s\n' "$show_date"
 printf 'show_user=%s\n' "$show_user"
 printf 'show_battery_bar=%s\n' "$show_bar"
 printf 'show_battery_status=%s\n' "$show_status"
+printf 'show_session=%s\n' "$show_session"
 printf 'show_host=%s\n' "$show_host"
 printf 'battery_bar_length=%s\n' "$render_length"
 printf 'battery_bar_palette=%s\n' "$render_palette"
 printf 'hostname=%s\n' "${omt_hostname:-<none>}"
 printf 'host_display=%s\n' "${host_display:-<none>}"
+printf 'session_name=%s\n' "${session_name:-<none>}"
+printf 'session_count=%s\n' "${session_count:-0}"
+printf 'session_display=%s\n' "${session_display:-<none>}"
 printf 'username=%s%s\n' "${omt_username:-}" "${omt_root:-}"
 printf '\n[preview]\n%s\n' "$preview"
