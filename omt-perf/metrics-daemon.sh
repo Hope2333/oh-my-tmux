@@ -29,43 +29,8 @@ fi
 
 tmux_conf="${TMUX_CONF:-$HOME/.config/tmux/tmux.conf}"
 omt_sh="${XDG_CACHE_HOME:-$HOME/.cache}/tmux/omt.sh"
+refresh_battery_bar="$HOME/.config/tmux/omt-perf/refresh-battery-bar.sh"
 metrics_interval_sec="${OMT_METRICS_INTERVAL_SEC:-75}"
-
-set_battery_bar() {
-	local battery_charge="$1"
-	local palette low_palette empty_symbol full_symbol bar_length client_width bar
-
-	if [ -z "$battery_charge" ]; then
-		"$tmux_bin" "${socket_args[@]}" set-option -gu @omt_battery_bar >/dev/null 2>&1 || true
-		return 0
-	fi
-
-	palette="$("$tmux_bin" "${socket_args[@]}" show-option -gv @omt_battery_bar_palette 2>/dev/null || true)"
-	low_palette="$("$tmux_bin" "${socket_args[@]}" show-option -gv @omt_battery_bar_low_palette 2>/dev/null || true)"
-	empty_symbol="$("$tmux_bin" "${socket_args[@]}" show-option -gv @omt_battery_bar_symbol_empty 2>/dev/null || true)"
-	full_symbol="$("$tmux_bin" "${socket_args[@]}" show-option -gv @omt_battery_bar_symbol_full 2>/dev/null || true)"
-	bar_length="$("$tmux_bin" "${socket_args[@]}" show-option -gv @omt_battery_bar_length 2>/dev/null || true)"
-
-	[ -n "$palette" ] || palette="gradient"
-	[ -n "$empty_symbol" ] || empty_symbol="◻"
-	[ -n "$full_symbol" ] || full_symbol="◼"
-	[ -n "$bar_length" ] || bar_length="8"
-
-	if [ -n "$low_palette" ] && (($(echo "$battery_charge < 0.18" | bc -l 2>/dev/null || echo 0))); then
-		palette="$low_palette"
-	fi
-	palette="${palette//,/;}"
-
-	client_width="$("$tmux_bin" "${socket_args[@]}" list-clients -F '#{client_width}' 2>/dev/null | sort -nr | sed -n '1p' || true)"
-	[ -n "$client_width" ] || client_width="80"
-
-	bar="$(sh "$omt_sh" _bar "$palette" "$empty_symbol" "$full_symbol" "$bar_length" "$battery_charge" "$client_width" 2>/dev/null || true)"
-	if [ -n "$bar" ]; then
-		"$tmux_bin" "${socket_args[@]}" set-option -g @omt_battery_bar "$bar"
-	else
-		"$tmux_bin" "${socket_args[@]}" set-option -gu @omt_battery_bar >/dev/null 2>&1 || true
-	fi
-}
 
 while [ "$("$tmux_bin" "${socket_args[@]}" display-message -p '#{pid}' 2>/dev/null || true)" != "" ]; do
 	if [ -x "$omt_sh" ]; then
@@ -91,7 +56,9 @@ while [ "$("$tmux_bin" "${socket_args[@]}" display-message -p '#{pid}' 2>/dev/nu
 		else
 			"$tmux_bin" "${socket_args[@]}" set-option -gu @omt_battery_pct >/dev/null 2>&1 || true
 		fi
-		set_battery_bar "$battery_charge"
+		if [ -x "$refresh_battery_bar" ]; then
+			"$refresh_battery_bar" >/dev/null 2>&1 || true
+		fi
 	fi
 	sleep "$metrics_interval_sec"
 	[ "$("$tmux_bin" "${socket_args[@]}" display-message -p '#{pid}' 2>/dev/null || true)" != "" ] || exit 0
