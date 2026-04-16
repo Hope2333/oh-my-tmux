@@ -8,6 +8,7 @@ Detailed language-separated docs live in the project workspace:
 If you only need script responsibilities quickly:
 
 - `apply.sh`: bootstrap + patch + hooks + daemon + mouse
+- `doctor.sh`: runtime inspection for socket, hooks, cached battery data, and hot paths
 - `reload.sh`: reload and re-apply
 - `update-pane-cache.sh`: ssh-aware identity cache (pane-scoped)
 - `refresh-client-panes.sh`: refresh active panes for clients
