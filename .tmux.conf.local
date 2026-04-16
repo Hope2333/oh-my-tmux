@@ -390,8 +390,8 @@ tmux_conf_urlscan_options="--compact --dedupe"
 #set -g mouse on
 
 set -g @omt_battery_bar_length "8"
-set -g @omt_battery_bar_palette "gradient"
-set -g @omt_battery_bar_low_palette "heat"
+set -g @omt_battery_bar_palette "#5294e2,#5294e2,#2f343f"
+set -g @omt_battery_bar_low_palette "#d70000,#d70000,#2f343f"
 set -g @omt_battery_bar_symbol_empty "◻"
 set -g @omt_battery_bar_symbol_full "◼"
 
