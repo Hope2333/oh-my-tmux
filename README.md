@@ -64,6 +64,11 @@ bash ~/.config/tmux/omt-perf/render-status.sh --width 72
 bash ~/.config/tmux/omt-perf/render-status.sh --width 56
 ```
 
+Current preview rules:
+
+- `<80`: compact mode, keep time + session hint first
+- `<64`: micro mode, keep time + shorter session hint only
+
 ## License
 
 Dual licensed under WTFPL v2 and MIT license.
