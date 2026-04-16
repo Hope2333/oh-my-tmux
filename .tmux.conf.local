@@ -269,7 +269,7 @@ tmux_conf_theme_right_separator_sub="|"
 #     - #{username_ssh}
 tmux_conf_theme_status_left=" ❐ #S | ↑#{?uptime_y, #{uptime_y}y,}#{?uptime_d, #{uptime_d}d,}#{?uptime_h, #{uptime_h}h,}#{?uptime_m, #{uptime_m}m,} "
 #tmux_conf_theme_status_left=" ❐ #S | ↑#{?uptime_y, #{uptime_y}y,}#{?uptime_d, #{uptime_d}d,}#{?uptime_h, #{uptime_h}h,}#{?uptime_m, #{uptime_m}m,} | #{pretty_pane_current_path} "
-tmux_conf_theme_status_right=" #{prefix}#{mouse}#{pairing}#{synchronized}#{?@omt_battery_status,#{@omt_battery_status},}#{?@omt_battery_pct, #{@omt_battery_pct},} #[fg=#8b949e,bg=#2f343f]|#[default] %R #[fg=#8b949e,bg=#2f343f]|#[default] %d %b #[fg=#8b949e,bg=#2f343f]#{@omt_username} #[fg=#d70000,bg=#2f343f,bold]#{@omt_root}#[fg=#d3dae3,bg=#3b72c8,bold] #{?@omt_hostname,#{@omt_hostname},#h} #[default]"
+tmux_conf_theme_status_right=" #{prefix}#{mouse}#{pairing}#{synchronized}#{?@omt_battery_status,#{@omt_battery_status},}#{?@omt_battery_pct, #{@omt_battery_pct},}#{?@omt_battery_bar, #{@omt_battery_bar},} #[fg=#8b949e,bg=#2f343f]|#[default] %R #[fg=#8b949e,bg=#2f343f]|#[default] %d %b #[fg=#8b949e,bg=#2f343f]#{@omt_username} #[fg=#d70000,bg=#2f343f,bold]#{@omt_root}#[fg=#d3dae3,bg=#3b72c8,bold] #{?@omt_hostname,#{@omt_hostname},#h} #[default]"
 
 # status left style (ArcGlass-Dark: dark panel with blue accent)
 tmux_conf_theme_status_left_fg="$tmux_conf_theme_colour_7,$tmux_conf_theme_colour_4,$tmux_conf_theme_colour_3"
@@ -382,6 +382,12 @@ tmux_conf_urlscan_options="--compact --dedupe"
 
 # start with mouse mode enabled
 #set -g mouse on
+
+set -g @omt_battery_bar_length "8"
+set -g @omt_battery_bar_palette "#5294e2,#5294e2,#2f343f"
+set -g @omt_battery_bar_low_palette "#d70000,#d70000,#2f343f"
+set -g @omt_battery_bar_symbol_empty "◻"
+set -g @omt_battery_bar_symbol_full "◼"
 
 run-shell -b "$HOME/.config/tmux/omt-perf/apply.sh"
 set-hook -g client-attached "run-shell -b '$HOME/.config/tmux/omt-perf/apply.sh'"
