@@ -12,8 +12,9 @@ status shell work. The status line should render from cached tmux options, while
 2. Keep username, hostname, root, battery status, battery percentage, and
    battery bar in `@omt_*` cache options.
 3. Run expensive battery and uptime probes only from `metrics-daemon.sh`.
-4. Refresh pane identity from hooks on pane/window/client changes.
-5. Verify every theme branch with an isolated tmux server before pushing.
+4. Recompute responsive status tiers from the narrowest attached client width.
+5. Refresh pane identity from hooks on pane/window/client changes.
+6. Verify every theme branch with an isolated tmux server before pushing.
 
 ## Verification Gates
 
@@ -21,7 +22,8 @@ status shell work. The status line should render from cached tmux options, while
 - `tmux show-option -gv status-right` contains no `cut -c3-`.
 - `tmux show-option -gv status-right` contains no `sh -s _battery_status`.
 - `tmux show-option -gv status-right` contains no `sh ... _bar`.
-- `tmux show-option -gv @omt_battery_bar` is non-empty when a battery exists.
+- `tmux show-option -gv @omt_battery_bar` is non-empty when width allows a battery bar.
+- `tmux show-option -gv @omt_battery_bar` is empty below the hide threshold.
 - `bash -n omt-perf/*.sh` passes.
 
 ## Branch Policy
