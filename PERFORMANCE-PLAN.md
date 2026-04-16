@@ -9,8 +9,8 @@ status shell work. The status line should render from cached tmux options, while
 ## Current Lane
 
 1. Remove `cut -c3- ... | sh -s` from `status-right`.
-2. Keep username, hostname, root, battery status, and battery percentage in
-   `@omt_*` cache options.
+2. Keep username, hostname, root, battery status, battery percentage, and
+   battery bar in `@omt_*` cache options.
 3. Run expensive battery and uptime probes only from `metrics-daemon.sh`.
 4. Refresh pane identity from hooks on pane/window/client changes.
 5. Verify every theme branch with an isolated tmux server before pushing.
@@ -21,6 +21,7 @@ status shell work. The status line should render from cached tmux options, while
 - `tmux show-option -gv status-right` contains no `cut -c3-`.
 - `tmux show-option -gv status-right` contains no `sh -s _battery_status`.
 - `tmux show-option -gv status-right` contains no `sh ... _bar`.
+- `tmux show-option -gv @omt_battery_bar` is non-empty when a battery exists.
 - `bash -n omt-perf/*.sh` passes.
 
 ## Branch Policy
