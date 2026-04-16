@@ -89,17 +89,19 @@ PY
 }
 
 install_hooks() {
-	local updater refresh
+	local updater refresh metrics
 	updater="$HOME/.config/tmux/omt-perf/update-pane-cache.sh"
 	refresh="$HOME/.config/tmux/omt-perf/refresh-client-panes.sh"
+	metrics="$HOME/.config/tmux/omt-perf/metrics-daemon.sh"
 
 	$tmux_bin "${socket_args[@]}" set-hook -g after-select-pane "run-shell -b '$updater \"#{pane_id}\"'"
 	$tmux_bin "${socket_args[@]}" set-hook -g after-select-window "run-shell -b '$updater \"#{pane_id}\"'"
 	$tmux_bin "${socket_args[@]}" set-hook -g after-new-window "run-shell -b '$updater \"#{pane_id}\"'"
 	$tmux_bin "${socket_args[@]}" set-hook -g after-split-window "run-shell -b '$updater \"#{pane_id}\"'"
-	$tmux_bin "${socket_args[@]}" set-hook -g client-attached "run-shell -b '$refresh'"
-	$tmux_bin "${socket_args[@]}" set-hook -g client-session-changed "run-shell -b '$refresh'"
-	$tmux_bin "${socket_args[@]}" set-hook -g session-created "run-shell -b '$refresh'"
+	$tmux_bin "${socket_args[@]}" set-hook -g client-attached "run-shell -b '$refresh' \; run-shell -b '$metrics --once'"
+	$tmux_bin "${socket_args[@]}" set-hook -g client-resized "run-shell -b '$metrics --once'"
+	$tmux_bin "${socket_args[@]}" set-hook -g client-session-changed "run-shell -b '$refresh' \; run-shell -b '$metrics --once'"
+	$tmux_bin "${socket_args[@]}" set-hook -g session-created "run-shell -b '$refresh' \; run-shell -b '$metrics --once'"
 }
 
 start_metrics_daemon() {
