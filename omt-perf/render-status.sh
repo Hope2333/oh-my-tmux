@@ -22,6 +22,8 @@ if [ -z "$tmux_conf_local" ]; then
 fi
 
 width=""
+compact_under=""
+micro_under=""
 hide_under=""
 small_under=""
 medium_under=""
@@ -33,6 +35,14 @@ while [ $# -gt 0 ]; do
 	case "$1" in
 	--width)
 		width="${2:-}"
+		shift 2
+		;;
+	--compact-under)
+		compact_under="${2:-}"
+		shift 2
+		;;
+	--micro-under)
+		micro_under="${2:-}"
 		shift 2
 		;;
 	--hide-under)
@@ -65,6 +75,8 @@ Usage: render-status.sh [options]
 
 Options:
   --width N          Render preview for client width N
+  --compact-under N  Use compact mode below width N
+  --micro-under N    Use micro mode below width N
   --hide-under N     Hide battery bar below width N
   --small-under N    Use short battery bar below width N
   --medium-under N   Use medium battery bar below width N
@@ -143,7 +155,20 @@ render_bar() {
 	printf '%s' "$bar"
 }
 
+truncate_ascii() {
+	local text="$1"
+	local max_len="$2"
+
+	if [ "${#text}" -le "$max_len" ]; then
+		printf '%s' "$text"
+	else
+		printf '%s' "${text:0:$max_len}"
+	fi
+}
+
 [ -n "$width" ] || width="$(current_width)"
+[ -n "$compact_under" ] || compact_under="80"
+[ -n "$micro_under" ] || micro_under="64"
 [ -n "$hide_under" ] || hide_under="88"
 [ -n "$small_under" ] || small_under="112"
 [ -n "$medium_under" ] || medium_under="140"
@@ -176,7 +201,29 @@ show_pct=1
 show_user=1
 show_date=1
 show_bar=1
+show_status=1
+show_host=1
+mode_name="full"
 render_length="$bar_length"
+host_display="$omt_hostname"
+
+if [ "$width" -lt "$micro_under" ]; then
+	mode_name="micro"
+	show_pct=0
+	show_user=0
+	show_date=0
+	show_bar=0
+	show_status=0
+	show_host=0
+elif [ "$width" -lt "$compact_under" ]; then
+	mode_name="compact"
+	show_pct=0
+	show_user=0
+	show_date=0
+	show_bar=0
+	show_status=0
+	host_display="$(truncate_ascii "$omt_hostname" 8)"
+fi
 
 if [ "$width" -lt "$pct_under" ]; then
 	show_pct=0
@@ -209,7 +256,7 @@ time_now="$(date +%R)"
 date_now="$(date '+%d %b')"
 preview=""
 
-if [ -n "$battery_status" ]; then
+if [ "$show_status" -eq 1 ] && [ -n "$battery_status" ]; then
 	preview="${preview}${battery_status}"
 fi
 
@@ -226,15 +273,21 @@ fi
 if [ "$show_user" -eq 1 ] && [ -n "$omt_username" ]; then
 	preview="${preview} | ${omt_username}${omt_root}"
 fi
-preview="${preview} | ${omt_hostname}"
+if [ "$show_host" -eq 1 ] && [ -n "$host_display" ]; then
+	preview="${preview} | ${host_display}"
+fi
 
 printf 'width=%s\n' "$width"
+printf 'mode=%s\n' "$mode_name"
 printf 'show_battery_pct=%s\n' "$show_pct"
 printf 'show_date=%s\n' "$show_date"
 printf 'show_user=%s\n' "$show_user"
 printf 'show_battery_bar=%s\n' "$show_bar"
+printf 'show_battery_status=%s\n' "$show_status"
+printf 'show_host=%s\n' "$show_host"
 printf 'battery_bar_length=%s\n' "$render_length"
 printf 'battery_bar_palette=%s\n' "$render_palette"
 printf 'hostname=%s\n' "${omt_hostname:-<none>}"
+printf 'host_display=%s\n' "${host_display:-<none>}"
 printf 'username=%s%s\n' "${omt_username:-}" "${omt_root:-}"
 printf '\n[preview]\n%s\n' "$preview"
