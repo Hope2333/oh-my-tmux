@@ -56,6 +56,12 @@ Inspect runtime state:
 bash ~/.config/tmux/omt-perf/doctor.sh
 ```
 
+Preview a future width tier before wiring it into hooks:
+
+```bash
+bash ~/.config/tmux/omt-perf/render-status.sh --width 96
+```
+
 ## License
 
 Dual licensed under WTFPL v2 and MIT license.
