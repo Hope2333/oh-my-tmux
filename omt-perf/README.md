@@ -9,7 +9,7 @@ If you only need script responsibilities quickly:
 
 - `apply.sh`: bootstrap + patch + hooks + daemon + mouse
 - `doctor.sh`: runtime inspection for socket, hooks, cached battery data, and hot paths
-- `render-status.sh`: width-driven offline preview for future responsive status rules, including sub-80 compact/micro modes
+- `render-status.sh`: width-driven offline preview for future responsive status rules, including sub-80 compact/micro modes that reserve space for session selection
 - `reload.sh`: reload and re-apply
 - `update-pane-cache.sh`: ssh-aware identity cache (pane-scoped)
 - `refresh-client-panes.sh`: refresh active panes for clients
