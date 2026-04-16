@@ -125,6 +125,7 @@ Run `~/.config/tmux/omt-perf/refresh-client-panes.sh` to force refresh pane cach
 1. Check for stale background processes: `ps aux | grep tmux | grep -v grep`
 2. Kill legacy loops: `pkill -f "cut -c3-.*_battery_info"`
 3. Re-apply optimizations: `bash ~/.config/tmux/omt-perf/apply.sh`
+4. Inspect runtime state: `bash ~/.config/tmux/omt-perf/doctor.sh`
 
 ### Colors look wrong
 
