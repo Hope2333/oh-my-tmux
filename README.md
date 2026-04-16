@@ -93,7 +93,7 @@ This lite edition includes the `omt-perf/` module:
 | Module | Description |
 |---|---|
 | **Pane Identity Cache** | Caches username/hostname per pane instead of querying on every status refresh |
-| **Battery Metrics Cache** | Caches battery status, percentage, and responsive bar in tmux options |
+| **Battery Metrics Cache** | Caches battery status, percentage, and bar in tmux options |
 | **Low-Frequency Metrics** | Battery and uptime updated every 75s instead of every status interval |
 | **Legacy Loop Cleanup** | Stops the default oh-my-tmux background loops that run every 60s |
 
