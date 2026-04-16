@@ -60,6 +60,8 @@ Preview a future width tier before wiring it into hooks:
 
 ```bash
 bash ~/.config/tmux/omt-perf/render-status.sh --width 96
+bash ~/.config/tmux/omt-perf/render-status.sh --width 72
+bash ~/.config/tmux/omt-perf/render-status.sh --width 56
 ```
 
 ## License
