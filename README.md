@@ -4,7 +4,7 @@ A lightweight, performance-optimized tmux configuration based on [Oh My Tmux!](h
 
 ## Features
 
-- ⚡ **Performance Optimized**: Status caches eliminate redundant shell calls
+- ⚡ **Performance Optimized**: Status caches eliminate redundant shell calls while keeping the battery bar visible
 - 🎨 **Themed Status Bar**: Clean, informative status line with battery, uptime, and SSH info
 - 🔧 **Easy Customization**: Override settings in `.tmux.conf.local`
 - 🖱️ **Mouse Support**: Click to select panes, scroll to navigate history
@@ -44,7 +44,7 @@ lite branch:
 The `omt-perf/` module provides:
 
 1. **Pane Identity Cache**: Caches username/hostname per pane instead of querying on every status refresh
-2. **Battery Metrics Cache**: Caches battery status and percentage in tmux options
+2. **Battery Metrics Cache**: Caches battery status, percentage, and bar in tmux options
 3. **Low-Frequency Metrics**: Battery and uptime updated every 75s instead of every status interval
 4. **Legacy Loop Cleanup**: Stops the default oh-my-tmux background loops
 
