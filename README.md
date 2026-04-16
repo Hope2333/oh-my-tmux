@@ -48,6 +48,14 @@ The `omt-perf/` module provides:
 3. **Low-Frequency Metrics**: Battery and uptime updated every 75s instead of every status interval
 4. **Legacy Loop Cleanup**: Stops the default oh-my-tmux background loops
 
+## Troubleshooting
+
+Inspect runtime state:
+
+```bash
+bash ~/.config/tmux/omt-perf/doctor.sh
+```
+
 ## License
 
 Dual licensed under WTFPL v2 and MIT license.
