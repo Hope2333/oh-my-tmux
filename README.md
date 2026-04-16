@@ -134,6 +134,14 @@ Ensure your terminal supports 256 colors and `$TERM` is set correctly:
 export TERM=xterm-256color
 ```
 
+Preview a future width tier before wiring it into hooks:
+
+```bash
+bash ~/.config/tmux/omt-perf/render-status.sh --width 96
+bash ~/.config/tmux/omt-perf/render-status.sh --width 72
+bash ~/.config/tmux/omt-perf/render-status.sh --width 56
+```
+
 ## License
 
 Dual licensed under the [WTFPL v2](LICENSE.WTFPL) and the [MIT license](LICENSE.MIT), without any warranty.
