@@ -96,6 +96,7 @@ This lite edition includes the `omt-perf/` module:
 | **Battery Metrics Cache** | Caches battery status, percentage, and bar in tmux options |
 | **Low-Frequency Metrics** | Battery and uptime updated every 75s instead of every status interval |
 | **Legacy Loop Cleanup** | Stops the default oh-my-tmux background loops that run every 60s |
+| **Resize Trigger** | `client-resized` refreshes the battery bar using width tiers without touching the rest of the status line |
 
 See [PERFORMANCE-PLAN.md](PERFORMANCE-PLAN.md) for the branch-wide optimization plan and verification gates.
 
