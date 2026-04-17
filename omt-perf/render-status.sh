@@ -166,6 +166,17 @@ truncate_ascii() {
 	fi
 }
 
+session_hint() {
+	local name="$1"
+	local max_len="$2"
+
+	if [[ "$name" =~ ^[0-9]+$ ]]; then
+		printf 'S%s' "$name"
+	else
+		truncate_ascii "$name" "$max_len"
+	fi
+}
+
 [ -n "$width" ] || width="$(current_width)"
 [ -n "$compact_under" ] || compact_under="80"
 [ -n "$micro_under" ] || micro_under="64"
@@ -226,7 +237,7 @@ if [ "$width" -lt "$micro_under" ]; then
 	show_status=0
 	show_session=1
 	show_host=0
-	session_display="$(truncate_ascii "$session_name" 4)"
+	session_display="$(session_hint "$session_name" 4)"
 elif [ "$width" -lt "$compact_under" ]; then
 	mode_name="compact"
 	show_pct=0
@@ -235,7 +246,7 @@ elif [ "$width" -lt "$compact_under" ]; then
 	show_bar=0
 	show_status=0
 	show_session=1
-	session_display="$(truncate_ascii "$session_name" 6)"
+	session_display="$(session_hint "$session_name" 6)"
 	if [ "$width" -ge 72 ]; then
 		host_display="$(truncate_ascii "$omt_hostname" 6)"
 	else

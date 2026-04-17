@@ -47,6 +47,17 @@ truncate_ascii() {
 	fi
 }
 
+session_hint() {
+	local name="$1"
+	local max_len="$2"
+
+	if [[ "$name" =~ ^[0-9]+$ ]]; then
+		printf 'S%s' "$name"
+	else
+		truncate_ascii "$name" "$max_len"
+	fi
+}
+
 width="$width_override"
 [ -n "$width" ] || width="$(client_width_floor)"
 
@@ -58,10 +69,10 @@ hostname_short="$("$tmux_bin" "${socket_args[@]}" display-message -p '#{?@omt_ho
 
 if [ "$width" -lt 64 ]; then
 	tmux_set @omt_status_compact 1
-	tmux_set @omt_status_compact_tail " | $(truncate_ascii "$session_name" 4)"
+	tmux_set @omt_status_compact_tail " | $(session_hint "$session_name" 4)"
 elif [ "$width" -lt 80 ]; then
 	tmux_set @omt_status_compact 1
-	tmux_set @omt_status_compact_tail " | $(truncate_ascii "$session_name" 6) | $(truncate_ascii "$hostname_short" 6)"
+	tmux_set @omt_status_compact_tail " | $(session_hint "$session_name" 6) | $(truncate_ascii "$hostname_short" 6)"
 else
 	tmux_unset @omt_status_compact
 	tmux_unset @omt_status_compact_tail
