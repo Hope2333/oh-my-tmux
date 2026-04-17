@@ -48,6 +48,7 @@ The `omt-perf/` module provides:
 3. **Low-Frequency Metrics**: Battery and uptime updated every 75s instead of every status interval
 4. **Legacy Loop Cleanup**: Stops the default oh-my-tmux background loops
 5. **Resize Trigger**: `client-resized` refreshes the battery bar using width tiers without touching the rest of the status line
+6. **Compact Tail**: Sub-80 widths switch the right tail to session-first compact labels
 
 ## Troubleshooting
 
