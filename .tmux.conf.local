@@ -393,6 +393,8 @@ set -g @omt_battery_bar_palette "#5294e2,#5294e2,#2f343f"
 set -g @omt_battery_bar_low_palette "#d70000,#d70000,#2f343f"
 set -g @omt_battery_bar_symbol_empty "◻"
 set -g @omt_battery_bar_symbol_full "◼"
+set -g @omt_status_tail_compact_prefix " #[fg=#8b949e,bg=#2f343f]|#[default]"
+set -g @omt_status_tail_full_template " #[fg=#8b949e,bg=#2f343f]|#[default] %d %b #[fg=#8b949e,bg=#2f343f]#{@omt_username} #[fg=#d70000,bg=#2f343f,bold]#{@omt_root}#[fg=#d3dae3,bg=#3b72c8,bold] #{?@omt_hostname,#{@omt_hostname},#h} #[default]"
 
 run-shell -b "$HOME/.config/tmux/omt-perf/apply.sh"
 set-hook -g client-attached "run-shell -b '$HOME/.config/tmux/omt-perf/apply.sh'"
