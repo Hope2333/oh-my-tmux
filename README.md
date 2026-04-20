@@ -142,16 +142,21 @@ CLI entrypoint:
 omtmux theme list
 omtmux theme current
 omtmux theme set arc-dark
+omtmux theme set --force arc-dark
 omtmux display mode list
 omtmux display mode get
 omtmux display mode set rounded
 omtmux display preset list
 omtmux display preset set compact
 omtmux display preview --width 72
+omtmux doctor --width 72
 ```
 
 Available display modes: `square` (default), `rounded`, `diamond`.
 Available display presets: `auto` (default), `full`, `compact`, `micro`.
+
+`omtmux theme set` now refuses to switch branches when the repo worktree is dirty unless you pass `--force`.
+`omtmux doctor --width N` prints the live tmux state and the matching offline status preview for width `N`.
 
 Preview a future width tier before wiring it into hooks:
 
