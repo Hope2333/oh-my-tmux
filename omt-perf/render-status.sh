@@ -22,6 +22,7 @@ if [ -z "$tmux_conf_local" ]; then
 fi
 
 width=""
+preset=""
 compact_under=""
 micro_under=""
 hide_under=""
@@ -35,6 +36,10 @@ while [ $# -gt 0 ]; do
 	case "$1" in
 	--width)
 		width="${2:-}"
+		shift 2
+		;;
+	--preset)
+		preset="${2:-}"
 		shift 2
 		;;
 	--compact-under)
@@ -75,6 +80,7 @@ Usage: render-status.sh [options]
 
 Options:
   --width N          Render preview for client width N
+  --preset NAME      Force preset: auto, full, compact, micro
   --compact-under N  Use compact mode below width N
   --micro-under N    Use micro mode below width N
   --hide-under N     Hide battery bar below width N
@@ -178,6 +184,8 @@ session_hint() {
 }
 
 [ -n "$width" ] || width="$(current_width)"
+[ -n "$preset" ] || preset="$(value_get @omt_display_preset)"
+[ -n "$preset" ] || preset="auto"
 [ -n "$compact_under" ] || compact_under="80"
 [ -n "$micro_under" ] || micro_under="64"
 [ -n "$hide_under" ] || hide_under="88"
@@ -228,7 +236,24 @@ render_length="$bar_length"
 host_display="$omt_hostname"
 session_display="$session_name"
 
-if [ "$width" -lt "$micro_under" ]; then
+case "$preset" in
+auto)
+	;;
+full)
+	mode_name="full"
+	;;
+compact)
+	mode_name="compact"
+	show_pct=0
+	show_user=0
+	show_date=0
+	show_bar=0
+	show_status=0
+	show_session=1
+	session_display="$(session_hint "$session_name" 6)"
+	host_display="$(truncate_ascii "$omt_hostname" 6)"
+	;;
+micro)
 	mode_name="micro"
 	show_pct=0
 	show_user=0
@@ -238,7 +263,24 @@ if [ "$width" -lt "$micro_under" ]; then
 	show_session=1
 	show_host=0
 	session_display="$(session_hint "$session_name" 4)"
-elif [ "$width" -lt "$compact_under" ]; then
+	;;
+*)
+	printf 'unknown preset: %s\n' "$preset" >&2
+	exit 1
+	;;
+esac
+
+if [ "$preset" = auto ] && [ "$width" -lt "$micro_under" ]; then
+	mode_name="micro"
+	show_pct=0
+	show_user=0
+	show_date=0
+	show_bar=0
+	show_status=0
+	show_session=1
+	show_host=0
+	session_display="$(session_hint "$session_name" 4)"
+elif [ "$preset" = auto ] && [ "$width" -lt "$compact_under" ]; then
 	mode_name="compact"
 	show_pct=0
 	show_user=0
@@ -310,6 +352,7 @@ if [ "$show_host" -eq 1 ] && [ -n "$host_display" ]; then
 fi
 
 printf 'width=%s\n' "$width"
+printf 'preset=%s\n' "$preset"
 printf 'mode=%s\n' "$mode_name"
 printf 'show_battery_pct=%s\n' "$show_pct"
 printf 'show_date=%s\n' "$show_date"
