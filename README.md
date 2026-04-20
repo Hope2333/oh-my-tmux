@@ -72,13 +72,16 @@ omtmux display preset list
 omtmux display preset set compact
 omtmux display preview --width 72
 omtmux doctor --width 72
+omtmux doctor --all-widths
 ```
 
 Available display modes: `square` (default), `rounded`, `diamond`.
 Available display presets: `auto` (default), `full`, `compact`, `micro`.
 
 `omtmux theme set` now refuses to switch branches when the repo worktree is dirty unless you pass `--force`.
+`omtmux theme list` shows git sync state and marks the live runtime theme.
 `omtmux doctor --width N` prints the live tmux state and the matching offline status preview for width `N`.
+`omtmux doctor --all-widths` prints the preview matrix for `56 / 64 / 72 / 80 / 96 / 120`.
 
 Preview a future width tier before wiring it into hooks:
 
