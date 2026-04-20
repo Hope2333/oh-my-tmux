@@ -139,14 +139,19 @@ export TERM=xterm-256color
 CLI entrypoint:
 
 ```bash
+omtmux theme list
 omtmux theme current
 omtmux theme set arc-dark
+omtmux display mode list
 omtmux display mode get
 omtmux display mode set rounded
+omtmux display preset list
+omtmux display preset set compact
 omtmux display preview --width 72
 ```
 
 Available display modes: `square` (default), `rounded`, `diamond`.
+Available display presets: `auto` (default), `full`, `compact`, `micro`.
 
 Preview a future width tier before wiring it into hooks:
 
