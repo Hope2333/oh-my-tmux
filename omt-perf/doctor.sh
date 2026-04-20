@@ -3,6 +3,7 @@ set -euo pipefail
 
 tmux_bin="${TMUX_PROGRAM:-tmux}"
 socket="${TMUX_SOCKET:-}"
+script_dir="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 if [ -z "$socket" ] && [ -n "${TMUX:-}" ]; then
 	socket="${TMUX%%,*}"
 fi
@@ -11,6 +12,31 @@ socket_args=()
 if [ -n "$socket" ]; then
 	socket_args=(-S "$socket")
 fi
+
+preview_width=""
+preview_preset=""
+while [ $# -gt 0 ]; do
+	case "$1" in
+	--width)
+		preview_width="${2:-}"
+		shift 2
+		;;
+	--preset)
+		preview_preset="${2:-}"
+		shift 2
+		;;
+	-h|--help)
+		cat <<'EOF'
+Usage: doctor.sh [--width N] [--preset auto|full|compact|micro]
+EOF
+		exit 0
+		;;
+	*)
+		printf 'unknown option: %s\n' "$1" >&2
+		exit 1
+		;;
+	esac
+done
 
 tmux_get() {
 	"$tmux_bin" "${socket_args[@]}" show-option -gv "$1" 2>/dev/null || true
@@ -29,6 +55,21 @@ hooks="$("$tmux_bin" "${socket_args[@]}" show-hooks -g 2>/dev/null | rg 'client-
 daemon_ps="$(ps -eo pid,ppid,stat,pcpu,pmem,comm,args | rg 'omt-perf/metrics-daemon.sh|flock -n .*/omt-metrics|bash -s' || true)"
 client_width_floor="$("$tmux_bin" "${socket_args[@]}" list-clients -F '#{client_width}' 2>/dev/null | sort -n | sed -n '1p' || true)"
 expanded_status_tail="$(tmux_msg '#{E:@omt_status_tail}')"
+mouse_state="$(tmux_get mouse)"
+
+if [ -z "$preview_width" ]; then
+	preview_width="$client_width_floor"
+fi
+
+preview_args=()
+if [ -n "$preview_width" ]; then
+	preview_args+=(--width "$preview_width")
+fi
+if [ -n "$preview_preset" ]; then
+	preview_args+=(--preset "$preview_preset")
+fi
+
+preview_output="$("$script_dir/render-status.sh" "${preview_args[@]}" 2>/dev/null || true)"
 
 hotpath_state="clean"
 case "$status_right" in
@@ -53,8 +94,12 @@ printf 'omt_status_tail_compact_prefix=%s\n' "$(tmux_get @omt_status_tail_compac
 printf 'omt_status_tail_full_template=%s\n' "$(tmux_get @omt_status_tail_full_template)"
 printf 'expanded_status_tail=%s\n' "${expanded_status_tail:-<none>}"
 printf 'client_width_floor=%s\n' "${client_width_floor:-<none>}"
+printf 'mouse=%s\n' "${mouse_state:-<none>}"
+printf 'preview_width=%s\n' "${preview_width:-<none>}"
+printf 'preview_preset=%s\n' "${preview_preset:-<auto>}"
 printf '\n[hooks]\n%s\n' "${hooks:-<none>}"
 printf '\n[clients]\n%s\n' "${attached_clients:-<none>}"
 printf '\n[status-left]\n%s\n' "${status_left:-<none>}"
 printf '\n[status-right]\n%s\n' "${status_right:-<none>}"
+printf '\n[preview]\n%s\n' "${preview_output:-<none>}"
 printf '\n[processes]\n%s\n' "${daemon_ps:-<none>}"

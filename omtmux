@@ -28,6 +28,56 @@ die() {
 	exit 1
 }
 
+git_status_porcelain() {
+	git -C "$repo_root" status --short
+}
+
+git_is_dirty() {
+	[ -n "$(git_status_porcelain)" ]
+}
+
+branch_upstream() {
+	local branch="$1"
+	local upstream
+
+	upstream="$(git -C "$repo_root" rev-parse --abbrev-ref "$branch@{upstream}" 2>/dev/null || true)"
+	if [ -n "$upstream" ]; then
+		printf '%s\n' "$upstream"
+		return 0
+	fi
+
+	if git -C "$repo_root" show-ref --verify --quiet "refs/remotes/origin/$branch"; then
+		printf 'origin/%s\n' "$branch"
+	fi
+}
+
+branch_sync_status() {
+	local branch="$1"
+	local upstream ahead behind counts
+
+	upstream="$(branch_upstream "$branch")"
+	if [ -z "$upstream" ]; then
+		printf 'no-upstream'
+		return 0
+	fi
+
+	counts="$(git -C "$repo_root" rev-list --left-right --count "${branch}...${upstream}" 2>/dev/null || true)"
+	ahead="$(printf '%s\n' "$counts" | awk '{print $1}')"
+	behind="$(printf '%s\n' "$counts" | awk '{print $2}')"
+	[ -n "$ahead" ] || ahead=0
+	[ -n "$behind" ] || behind=0
+
+	if [ "$ahead" -eq 0 ] && [ "$behind" -eq 0 ]; then
+		printf 'sync'
+	elif [ "$ahead" -gt 0 ] && [ "$behind" -eq 0 ]; then
+		printf 'ahead %s' "$ahead"
+	elif [ "$ahead" -eq 0 ] && [ "$behind" -gt 0 ]; then
+		printf 'behind %s' "$behind"
+	else
+		printf 'diverged +%s/-%s' "$ahead" "$behind"
+	fi
+}
+
 tmux_get() {
 	"$tmux_bin" "${socket_args[@]}" show-option -gv "$1" 2>/dev/null || true
 }
@@ -139,14 +189,19 @@ display_mode_current() {
 
 theme_list() {
 	local current
+	local marker sync_state
 	current="$(current_branch)"
 	for branch in lite arc-dark arc-light arc-glass-dark arc-glass-light; do
+		marker=" "
 		if [ "$branch" = "$current" ]; then
-			printf '* %s\n' "$branch"
-		else
-			printf '  %s\n' "$branch"
+			marker="*"
 		fi
+		sync_state="$(branch_sync_status "$branch")"
+		printf '%s %s (%s)\n' "$marker" "$branch" "$sync_state"
 	done
+	if git_is_dirty; then
+		printf '! worktree has local changes\n'
+	fi
 }
 
 theme_names() {
@@ -154,8 +209,16 @@ theme_names() {
 }
 
 theme_set() {
-	local branch="$1"
+	local force="${1:-}"
+	local branch="${2:-}"
+	if [ "$force" != "--force" ]; then
+		branch="$force"
+		force=""
+	fi
 	theme_names | rg -x "$branch" >/dev/null || die "unknown theme branch: $branch"
+	if git_is_dirty && [ "$force" != "--force" ]; then
+		die "refusing to switch theme with a dirty worktree; commit/stash first or use: omtmux theme set --force $branch"
+	fi
 	git -C "$repo_root" checkout "$branch" >/dev/null
 	sync_branch_to_local
 	reload_tmux
@@ -209,7 +272,7 @@ usage() {
 Usage:
   omtmux theme list
   omtmux theme current
-  omtmux theme set <lite|arc-dark|arc-light|arc-glass-dark|arc-glass-light>
+  omtmux theme set [--force] <lite|arc-dark|arc-light|arc-glass-dark|arc-glass-light>
   omtmux display mode list
   omtmux display mode get
   omtmux display mode set <square|rounded|diamond>
@@ -228,7 +291,20 @@ theme)
 	case "$sub" in
 	list) theme_list ;;
 	current) current_branch ;;
-	set) [ $# -ge 3 ] || die "missing branch"; theme_set "$3" ;;
+	set)
+		case "${3:-}" in
+		--force)
+			[ $# -ge 4 ] || die "missing branch"
+			theme_set --force "$4"
+			;;
+		"")
+			die "missing branch"
+			;;
+		*)
+			theme_set "$3"
+			;;
+		esac
+		;;
 	*) usage; exit 1 ;;
 	esac
 	;;
@@ -255,13 +331,14 @@ display)
 		;;
 	preview)
 		shift 2
-		exec "$tmux_perf_dir/render-status.sh" "$@"
+		exec bash "$tmux_perf_dir/render-status.sh" "$@"
 		;;
 	*) usage; exit 1 ;;
 	esac
 	;;
 doctor)
-	exec "$tmux_perf_dir/doctor.sh"
+	shift
+	exec bash "$tmux_perf_dir/doctor.sh" "$@"
 	;;
 ""|-h|--help)
 	usage
