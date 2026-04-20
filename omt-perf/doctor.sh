@@ -15,6 +15,7 @@ fi
 
 preview_width=""
 preview_preset=""
+all_widths=0
 while [ $# -gt 0 ]; do
 	case "$1" in
 	--width)
@@ -25,9 +26,13 @@ while [ $# -gt 0 ]; do
 		preview_preset="${2:-}"
 		shift 2
 		;;
+	--all-widths)
+		all_widths=1
+		shift
+		;;
 	-h|--help)
 		cat <<'EOF'
-Usage: doctor.sh [--width N] [--preset auto|full|compact|micro]
+Usage: doctor.sh [--width N] [--preset auto|full|compact|micro] [--all-widths]
 EOF
 		exit 0
 		;;
@@ -46,6 +51,21 @@ tmux_msg() {
 	"$tmux_bin" "${socket_args[@]}" display-message -p "$1" 2>/dev/null || true
 }
 
+render_preview() {
+	local width_arg="$1"
+	local preset_arg="$2"
+	local args=()
+
+	if [ -n "$width_arg" ]; then
+		args+=(--width "$width_arg")
+	fi
+	if [ -n "$preset_arg" ]; then
+		args+=(--preset "$preset_arg")
+	fi
+
+	bash "$script_dir/render-status.sh" "${args[@]}" 2>/dev/null || true
+}
+
 status_right="$(tmux_get status-right)"
 status_left="$(tmux_get status-left)"
 socket_path="$(tmux_msg '#{socket_path}')"
@@ -56,20 +76,23 @@ daemon_ps="$(ps -eo pid,ppid,stat,pcpu,pmem,comm,args | rg 'omt-perf/metrics-dae
 client_width_floor="$("$tmux_bin" "${socket_args[@]}" list-clients -F '#{client_width}' 2>/dev/null | sort -n | sed -n '1p' || true)"
 expanded_status_tail="$(tmux_msg '#{E:@omt_status_tail}')"
 mouse_state="$(tmux_get mouse)"
+theme_branch="$(tmux_get @omt_theme_branch)"
 
 if [ -z "$preview_width" ]; then
 	preview_width="$client_width_floor"
 fi
-
-preview_args=()
-if [ -n "$preview_width" ]; then
-	preview_args+=(--width "$preview_width")
+if [ -z "$preview_preset" ]; then
+	preview_preset="auto"
 fi
-if [ -n "$preview_preset" ]; then
-	preview_args+=(--preset "$preview_preset")
-fi
+preview_output="$(render_preview "$preview_width" "$preview_preset")"
 
-preview_output="$("$script_dir/render-status.sh" "${preview_args[@]}" 2>/dev/null || true)"
+all_widths_output=""
+if [ "$all_widths" -eq 1 ]; then
+	for width in 56 64 72 80 96 120; do
+		all_widths_output="${all_widths_output}--- width=${width} preset=${preview_preset} ---"$'\n'
+		all_widths_output="${all_widths_output}$(render_preview "$width" "$preview_preset")"$'\n'
+	done
+fi
 
 hotpath_state="clean"
 case "$status_right" in
@@ -87,6 +110,7 @@ printf 'battery_status=%s\n' "$(tmux_get @battery_status)"
 printf 'omt_battery_bar=%s\n' "$(tmux_get @omt_battery_bar)"
 printf 'omt_battery_pct=%s\n' "$(tmux_get @omt_battery_pct)"
 printf 'omt_hostname=%s\n' "$(tmux_msg '#{?@omt_hostname,#{@omt_hostname},#h}')"
+printf 'omt_theme_branch=%s\n' "${theme_branch:-<none>}"
 printf 'omt_status_compact=%s\n' "$(tmux_get @omt_status_compact)"
 printf 'omt_status_compact_tail=%s\n' "$(tmux_get @omt_status_compact_tail)"
 printf 'omt_status_tail=%s\n' "$(tmux_get @omt_status_tail)"
@@ -96,10 +120,13 @@ printf 'expanded_status_tail=%s\n' "${expanded_status_tail:-<none>}"
 printf 'client_width_floor=%s\n' "${client_width_floor:-<none>}"
 printf 'mouse=%s\n' "${mouse_state:-<none>}"
 printf 'preview_width=%s\n' "${preview_width:-<none>}"
-printf 'preview_preset=%s\n' "${preview_preset:-<auto>}"
+printf 'preview_preset=%s\n' "${preview_preset}"
 printf '\n[hooks]\n%s\n' "${hooks:-<none>}"
 printf '\n[clients]\n%s\n' "${attached_clients:-<none>}"
 printf '\n[status-left]\n%s\n' "${status_left:-<none>}"
 printf '\n[status-right]\n%s\n' "${status_right:-<none>}"
 printf '\n[preview]\n%s\n' "${preview_output:-<none>}"
+if [ "$all_widths" -eq 1 ]; then
+	printf '\n[all-widths]\n%s' "${all_widths_output:-<none>}"
+fi
 printf '\n[processes]\n%s\n' "${daemon_ps:-<none>}"
