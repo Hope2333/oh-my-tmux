@@ -86,6 +86,22 @@ tmux_set() {
 	"$tmux_bin" "${socket_args[@]}" set-option -g "$1" "$2"
 }
 
+config_get() {
+	local key="$1"
+	local file="$tmux_conf_local"
+
+	[ -f "$file" ] || return 0
+	awk -v key="$key" '
+		$1 == "set" && $2 == "-g" && $3 == key {
+			sub(/^[^[:space:]]+[[:space:]]+[^[:space:]]+[[:space:]]+[^[:space:]]+[[:space:]]+/, "", $0)
+			gsub(/^"/, "", $0)
+			gsub(/"$/, "", $0)
+			print $0
+			exit
+		}
+	' "$file" 2>/dev/null || true
+}
+
 sync_branch_to_local() {
 	mkdir -p "$tmux_config_home"
 	ln -sfn "$repo_root/.tmux.conf" "$tmux_conf"
@@ -109,6 +125,18 @@ reload_tmux() {
 
 current_branch() {
 	git -C "$repo_root" branch --show-current
+}
+
+runtime_theme_current() {
+	local theme
+	theme="$(tmux_get @omt_theme_branch)"
+	if [ -n "$theme" ]; then
+		printf '%s\n' "$theme"
+		return 0
+	fi
+
+	theme="$(config_get @omt_theme_branch)"
+	printf '%s\n' "$theme"
 }
 
 display_mode_list() {
@@ -188,16 +216,20 @@ display_mode_current() {
 }
 
 theme_list() {
-	local current
-	local marker sync_state
+	local current runtime marker sync_state details
 	current="$(current_branch)"
+	runtime="$(runtime_theme_current)"
 	for branch in lite arc-dark arc-light arc-glass-dark arc-glass-light; do
 		marker=" "
 		if [ "$branch" = "$current" ]; then
 			marker="*"
 		fi
 		sync_state="$(branch_sync_status "$branch")"
-		printf '%s %s (%s)\n' "$marker" "$branch" "$sync_state"
+		details="$sync_state"
+		if [ "$branch" = "$runtime" ]; then
+			details="$details, live"
+		fi
+		printf '%s %s (%s)\n' "$marker" "$branch" "$details"
 	done
 	if git_is_dirty; then
 		printf '! worktree has local changes\n'
@@ -221,6 +253,8 @@ theme_set() {
 	fi
 	git -C "$repo_root" checkout "$branch" >/dev/null
 	sync_branch_to_local
+	set_config_value "@omt_theme_branch" "$branch"
+	"$tmux_bin" "${socket_args[@]}" set-option -g @omt_theme_branch "$branch" >/dev/null 2>&1 || true
 	reload_tmux
 	if [ -x "$tmux_perf_dir/refresh-battery-bar.sh" ]; then
 		"$tmux_perf_dir/refresh-battery-bar.sh" >/dev/null 2>&1 || true
