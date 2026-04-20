@@ -136,6 +136,16 @@ Ensure your terminal supports 256 colors and `$TERM` is set correctly:
 export TERM=xterm-256color
 ```
 
+CLI entrypoint:
+
+```bash
+omtmux theme current
+omtmux theme set arc-dark
+omtmux display mode get
+omtmux display mode set rounded
+omtmux display preview --width 72
+```
+
 Preview a future width tier before wiring it into hooks:
 
 ```bash
