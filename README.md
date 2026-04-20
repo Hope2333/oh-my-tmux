@@ -68,6 +68,8 @@ omtmux display mode set rounded
 omtmux display preview --width 72
 ```
 
+Available display modes: `square` (default), `rounded`, `diamond`.
+
 Preview a future width tier before wiring it into hooks:
 
 ```bash
