@@ -29,6 +29,10 @@ tmux_unset() {
 	"$tmux_bin" "${socket_args[@]}" set-option -gu "$1" >/dev/null 2>&1 || true
 }
 
+tmux_get() {
+	"$tmux_bin" "${socket_args[@]}" show-option -gv "$1" 2>/dev/null || true
+}
+
 client_width_floor() {
 	local width
 	width="$("$tmux_bin" "${socket_args[@]}" list-clients -F '#{client_width}' 2>/dev/null | sort -n | sed -n '1p' || true)"
@@ -67,13 +71,21 @@ hostname_short="$("$tmux_bin" "${socket_args[@]}" display-message -p '#{?@omt_ho
 [ -n "$session_name" ] || session_name="S"
 [ -n "$hostname_short" ] || hostname_short="$(hostname -s 2>/dev/null || printf 'host')"
 
+compact_prefix="$(tmux_get @omt_status_tail_compact_prefix)"
+full_template="$(tmux_get @omt_status_tail_full_template)"
+[ -n "$compact_prefix" ] || compact_prefix=" |"
+[ -n "$full_template" ] || full_template=" | %d %b | #{@omt_username}#{@omt_root} | #{?@omt_hostname,#{@omt_hostname},#h}"
+
 if [ "$width" -lt 64 ]; then
 	tmux_set @omt_status_compact 1
 	tmux_set @omt_status_compact_tail " | $(session_hint "$session_name" 4)"
+	tmux_set @omt_status_tail "${compact_prefix}$(tmux_get @omt_status_compact_tail)"
 elif [ "$width" -lt 80 ]; then
 	tmux_set @omt_status_compact 1
 	tmux_set @omt_status_compact_tail " | $(session_hint "$session_name" 6) | $(truncate_ascii "$hostname_short" 6)"
+	tmux_set @omt_status_tail "${compact_prefix}$(tmux_get @omt_status_compact_tail)"
 else
 	tmux_unset @omt_status_compact
 	tmux_unset @omt_status_compact_tail
+	tmux_set @omt_status_tail "$full_template"
 fi
