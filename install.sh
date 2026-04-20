@@ -110,6 +110,13 @@
 		if is_true "$DRY_RUN" || cp "$OH_MY_TMUX_CLONE_PATH/.tmux.conf.local" "$TMUX_CONF_LOCAL"; then
 			printf '✅ Copied %s → %s\n' "${OH_MY_TMUX_CLONE_PATH/#"$HOME"/'~'}/.tmux.conf.local" "${TMUX_CONF_LOCAL/#"$HOME"/'~'}" >&2
 		fi
+		OMTMUX_BIN_DIR="${HOME}/.local/bin"
+		if ! is_true "$DRY_RUN"; then
+			mkdir -p "$OMTMUX_BIN_DIR"
+		fi
+		if is_true "$DRY_RUN" || ln -s -f "$OH_MY_TMUX_CLONE_PATH/omtmux" "$OMTMUX_BIN_DIR/omtmux"; then
+			printf '✅ Symlinked %s → %s\n' "${OMTMUX_BIN_DIR/#"$HOME"/'~'}/omtmux" "${OH_MY_TMUX_CLONE_PATH/#"$HOME"/'~'}/omtmux" >&2
+		fi
 
 		# Source if tmux is running
 		tmux() {
@@ -126,6 +133,7 @@
 		printf '\n' >&2
 		printf '💡 Edit %s to customize your config\n' "${TMUX_CONF_LOCAL/#"$HOME"/'~'}" >&2
 		printf '💡 Press <prefix> + r to reload, <prefix> + e to edit\n' >&2
+		printf '💡 Run omtmux theme current / omtmux display mode get\n' >&2
 	}
 
 	install
