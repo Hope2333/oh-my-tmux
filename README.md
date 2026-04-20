@@ -58,6 +58,16 @@ Inspect runtime state:
 bash ~/.config/tmux/omt-perf/doctor.sh
 ```
 
+CLI entrypoint:
+
+```bash
+omtmux theme current
+omtmux theme set arc-dark
+omtmux display mode get
+omtmux display mode set rounded
+omtmux display preview --width 72
+```
+
 Preview a future width tier before wiring it into hooks:
 
 ```bash
