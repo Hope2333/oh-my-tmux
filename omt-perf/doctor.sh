@@ -28,6 +28,7 @@ attached_clients="$("$tmux_bin" "${socket_args[@]}" list-clients -F '#{client_na
 hooks="$("$tmux_bin" "${socket_args[@]}" show-hooks -g 2>/dev/null | rg 'client-attached|client-resized|client-session-changed|session-created' || true)"
 daemon_ps="$(ps -eo pid,ppid,stat,pcpu,pmem,comm,args | rg 'omt-perf/metrics-daemon.sh|flock -n .*/omt-metrics|bash -s' || true)"
 client_width_floor="$("$tmux_bin" "${socket_args[@]}" list-clients -F '#{client_width}' 2>/dev/null | sort -n | sed -n '1p' || true)"
+expanded_status_tail="$(tmux_msg '#{E:@omt_status_tail}')"
 
 hotpath_state="clean"
 case "$status_right" in
@@ -50,6 +51,7 @@ printf 'omt_status_compact_tail=%s\n' "$(tmux_get @omt_status_compact_tail)"
 printf 'omt_status_tail=%s\n' "$(tmux_get @omt_status_tail)"
 printf 'omt_status_tail_compact_prefix=%s\n' "$(tmux_get @omt_status_tail_compact_prefix)"
 printf 'omt_status_tail_full_template=%s\n' "$(tmux_get @omt_status_tail_full_template)"
+printf 'expanded_status_tail=%s\n' "${expanded_status_tail:-<none>}"
 printf 'client_width_floor=%s\n' "${client_width_floor:-<none>}"
 printf '\n[hooks]\n%s\n' "${hooks:-<none>}"
 printf '\n[clients]\n%s\n' "${attached_clients:-<none>}"
