@@ -8,10 +8,15 @@ if [ -n "${TMUX_SOCKET:-}" ]; then
 fi
 
 width_override=""
+preset_override=""
 while [ $# -gt 0 ]; do
 	case "$1" in
 	--width)
 		width_override="${2:-}"
+		shift 2
+		;;
+	--preset)
+		preset_override="${2:-}"
 		shift 2
 		;;
 	*)
@@ -64,6 +69,9 @@ session_hint() {
 
 width="$width_override"
 [ -n "$width" ] || width="$(client_width_floor)"
+preset="$preset_override"
+[ -n "$preset" ] || preset="$(tmux_get @omt_display_preset)"
+[ -n "$preset" ] || preset="auto"
 
 session_name="$("$tmux_bin" "${socket_args[@]}" display-message -p '#S' 2>/dev/null || true)"
 hostname_short="$("$tmux_bin" "${socket_args[@]}" display-message -p '#{?@omt_hostname,#{@omt_hostname},#h}' 2>/dev/null || true)"
@@ -75,6 +83,33 @@ compact_prefix="$(tmux_get @omt_status_tail_compact_prefix)"
 full_template="$(tmux_get @omt_status_tail_full_template)"
 [ -n "$compact_prefix" ] || compact_prefix=" |"
 [ -n "$full_template" ] || full_template=" | %d %b | #{@omt_username}#{@omt_root} | #{?@omt_hostname,#{@omt_hostname},#h}"
+
+case "$preset" in
+auto)
+	;;
+full)
+	tmux_unset @omt_status_compact
+	tmux_unset @omt_status_compact_tail
+	tmux_set @omt_status_tail "$full_template"
+	exit 0
+	;;
+compact)
+	tmux_set @omt_status_compact 1
+	tmux_set @omt_status_compact_tail " | $(session_hint "$session_name" 6) | $(truncate_ascii "$hostname_short" 6)"
+	tmux_set @omt_status_tail "${compact_prefix}$(tmux_get @omt_status_compact_tail)"
+	exit 0
+	;;
+micro)
+	tmux_set @omt_status_compact 1
+	tmux_set @omt_status_compact_tail " | $(session_hint "$session_name" 4)"
+	tmux_set @omt_status_tail "${compact_prefix}$(tmux_get @omt_status_compact_tail)"
+	exit 0
+	;;
+*)
+	printf 'unknown display preset: %s\n' "$preset" >&2
+	exit 1
+	;;
+esac
 
 if [ "$width" -lt 64 ]; then
 	tmux_set @omt_status_compact 1

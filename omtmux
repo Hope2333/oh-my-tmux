@@ -9,6 +9,7 @@ if command -v readlink >/dev/null 2>&1; then
 	fi
 fi
 repo_root="$(cd -- "$(dirname -- "$script_path")" && pwd)"
+repo_perf_dir="$repo_root/omt-perf"
 tmux_config_home="${XDG_CONFIG_HOME:-$HOME/.config}/tmux"
 tmux_conf="$tmux_config_home/tmux.conf"
 tmux_conf_local="$tmux_config_home/tmux.conf.local"
@@ -27,6 +28,10 @@ die() {
 	exit 1
 }
 
+tmux_get() {
+	"$tmux_bin" "${socket_args[@]}" show-option -gv "$1" 2>/dev/null || true
+}
+
 tmux_set() {
 	"$tmux_bin" "${socket_args[@]}" set-option -g "$1" "$2"
 }
@@ -36,7 +41,14 @@ sync_branch_to_local() {
 	ln -sfn "$repo_root/.tmux.conf" "$tmux_conf"
 	cp "$repo_root/.tmux.conf.local" "$tmux_conf_local"
 	rm -rf "$tmux_perf_dir"
-	cp -a "$repo_root/omt-perf" "$tmux_perf_dir"
+	cp -a "$repo_perf_dir" "$tmux_perf_dir"
+}
+
+sync_runtime_scripts() {
+	mkdir -p "$tmux_config_home"
+	ln -sfn "$repo_root/.tmux.conf" "$tmux_conf"
+	rm -rf "$tmux_perf_dir"
+	cp -a "$repo_perf_dir" "$tmux_perf_dir"
 }
 
 reload_tmux() {
@@ -47,6 +59,37 @@ reload_tmux() {
 
 current_branch() {
 	git -C "$repo_root" branch --show-current
+}
+
+display_mode_list() {
+	local current
+	current="$(display_mode_current)"
+	for mode in square rounded diamond; do
+		if [ "$mode" = "$current" ]; then
+			printf '* %s\n' "$mode"
+		else
+			printf '  %s\n' "$mode"
+		fi
+	done
+}
+
+display_preset_current() {
+	local preset
+	preset="$(tmux_get @omt_display_preset)"
+	[ -n "$preset" ] || preset="auto"
+	printf '%s\n' "$preset"
+}
+
+display_preset_list() {
+	local current
+	current="$(display_preset_current)"
+	for preset in auto full compact micro; do
+		if [ "$preset" = "$current" ]; then
+			printf '* %s\n' "$preset"
+		else
+			printf '  %s\n' "$preset"
+		fi
+	done
 }
 
 set_config_value() {
@@ -95,15 +138,33 @@ display_mode_current() {
 }
 
 theme_list() {
+	local current
+	current="$(current_branch)"
+	for branch in lite arc-dark arc-light arc-glass-dark arc-glass-light; do
+		if [ "$branch" = "$current" ]; then
+			printf '* %s\n' "$branch"
+		else
+			printf '  %s\n' "$branch"
+		fi
+	done
+}
+
+theme_names() {
 	printf '%s\n' lite arc-dark arc-light arc-glass-dark arc-glass-light
 }
 
 theme_set() {
 	local branch="$1"
-	theme_list | rg -x "$branch" >/dev/null || die "unknown theme branch: $branch"
+	theme_names | rg -x "$branch" >/dev/null || die "unknown theme branch: $branch"
 	git -C "$repo_root" checkout "$branch" >/dev/null
 	sync_branch_to_local
 	reload_tmux
+	if [ -x "$tmux_perf_dir/refresh-battery-bar.sh" ]; then
+		"$tmux_perf_dir/refresh-battery-bar.sh" >/dev/null 2>&1 || true
+	fi
+	if [ -x "$tmux_perf_dir/refresh-status-tail.sh" ]; then
+		"$tmux_perf_dir/refresh-status-tail.sh" >/dev/null 2>&1 || true
+	fi
 	printf 'theme=%s\n' "$branch"
 }
 
@@ -116,6 +177,7 @@ display_mode_set() {
 	set_config_value "@omt_display_mode" "$mode"
 	set_config_value "@omt_battery_bar_symbol_full" "$full"
 	set_config_value "@omt_battery_bar_symbol_empty" "$empty"
+	sync_runtime_scripts
 	tmux_set @omt_display_mode "$mode"
 	tmux_set @omt_battery_bar_symbol_full "$full"
 	tmux_set @omt_battery_bar_symbol_empty "$empty"
@@ -126,14 +188,34 @@ display_mode_set() {
 	printf 'display_mode=%s\n' "$mode"
 }
 
+display_preset_set() {
+	local preset="$1"
+	case "$preset" in
+	auto | full | compact | micro) ;;
+	*) die "unknown display preset: $preset" ;;
+	esac
+	set_config_value "@omt_display_preset" "$preset"
+	sync_runtime_scripts
+	tmux_set @omt_display_preset "$preset"
+	if [ -x "$tmux_perf_dir/refresh-status-tail.sh" ]; then
+		"$tmux_perf_dir/refresh-status-tail.sh" --preset "$preset" >/dev/null 2>&1 || true
+	fi
+	reload_tmux
+	printf 'display_preset=%s\n' "$preset"
+}
+
 usage() {
 	cat <<'EOF'
 Usage:
   omtmux theme list
   omtmux theme current
   omtmux theme set <lite|arc-dark|arc-light|arc-glass-dark|arc-glass-light>
+  omtmux display mode list
   omtmux display mode get
   omtmux display mode set <square|rounded|diamond>
+  omtmux display preset list
+  omtmux display preset get
+  omtmux display preset set <auto|full|compact|micro>
   omtmux display preview --width <n>
   omtmux doctor
 EOF
@@ -156,8 +238,18 @@ display)
 	mode)
 		action="${3:-}"
 		case "$action" in
+		list) display_mode_list ;;
 		get) display_mode_current ;;
 		set) [ $# -ge 4 ] || die "missing mode"; display_mode_set "$4" ;;
+		*) usage; exit 1 ;;
+		esac
+		;;
+	preset)
+		action="${3:-}"
+		case "$action" in
+		list) display_preset_list ;;
+		get) display_preset_current ;;
+		set) [ $# -ge 4 ] || die "missing preset"; display_preset_set "$4" ;;
 		*) usage; exit 1 ;;
 		esac
 		;;
