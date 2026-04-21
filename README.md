@@ -154,6 +154,7 @@ omtmux display preview --width 72
 omtmux doctor --width 72
 omtmux doctor --all-widths
 omtmux doctor --json
+omtmux verify
 ```
 
 Available display modes: `square` (default), `rounded`, `diamond`.
@@ -164,7 +165,8 @@ Available display presets: `auto` (default), `full`, `compact`, `micro`.
 `omtmux display preset save-default` persists your preferred preset across theme switches, and `reset-default` puts it back to `auto`.
 `omtmux doctor --width N` prints the live tmux state and the matching offline status preview for width `N`.
 `omtmux doctor --all-widths` prints the preview matrix for `56 / 64 / 72 / 80 / 96 / 120`.
-`omtmux doctor --json` emits the same runtime snapshot as JSON.
+`omtmux doctor --json` emits the same runtime snapshot as structured JSON.
+`omtmux verify` runs the current hotpath and width-tier assertions against the live theme.
 
 Preview a future width tier before wiring it into hooks:
 
