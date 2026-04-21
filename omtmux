@@ -102,6 +102,19 @@ config_get() {
 	' "$file" 2>/dev/null || true
 }
 
+value_get() {
+	local key="$1"
+	local value
+
+	value="$(tmux_get "$key")"
+	if [ -n "$value" ]; then
+		printf '%s\n' "$value"
+		return 0
+	fi
+
+	config_get "$key"
+}
+
 sync_branch_to_local() {
 	mkdir -p "$tmux_config_home"
 	ln -sfn "$repo_root/.tmux.conf" "$tmux_conf"
@@ -153,20 +166,35 @@ display_mode_list() {
 
 display_preset_current() {
 	local preset
-	preset="$(tmux_get @omt_display_preset)"
+	preset="$(value_get @omt_display_preset)"
+	if [ -z "$preset" ]; then
+		preset="$(display_preset_default)"
+	fi
+	[ -n "$preset" ] || preset="auto"
+	printf '%s\n' "$preset"
+}
+
+display_preset_default() {
+	local preset
+	preset="$(value_get @omt_display_preset_default)"
 	[ -n "$preset" ] || preset="auto"
 	printf '%s\n' "$preset"
 }
 
 display_preset_list() {
-	local current
+	local current default marker suffix
 	current="$(display_preset_current)"
+	default="$(display_preset_default)"
 	for preset in auto full compact micro; do
+		marker=" "
+		suffix=""
 		if [ "$preset" = "$current" ]; then
-			printf '* %s\n' "$preset"
-		else
-			printf '  %s\n' "$preset"
+			marker="*"
 		fi
+		if [ "$preset" = "$default" ]; then
+			suffix=" (default)"
+		fi
+		printf '%s %s%s\n' "$marker" "$preset" "$suffix"
 	done
 }
 
@@ -243,6 +271,7 @@ theme_names() {
 theme_set() {
 	local force="${1:-}"
 	local branch="${2:-}"
+	local saved_mode saved_full saved_empty saved_preset saved_preset_default
 	if [ "$force" != "--force" ]; then
 		branch="$force"
 		force=""
@@ -251,10 +280,41 @@ theme_set() {
 	if git_is_dirty && [ "$force" != "--force" ]; then
 		die "refusing to switch theme with a dirty worktree; commit/stash first or use: omtmux theme set --force $branch"
 	fi
+	saved_mode="$(value_get @omt_display_mode)"
+	saved_full="$(value_get @omt_battery_bar_symbol_full)"
+	saved_empty="$(value_get @omt_battery_bar_symbol_empty)"
+	saved_preset="$(value_get @omt_display_preset)"
+	saved_preset_default="$(display_preset_default)"
 	git -C "$repo_root" checkout "$branch" >/dev/null
 	sync_branch_to_local
 	set_config_value "@omt_theme_branch" "$branch"
+	if [ -n "$saved_mode" ]; then
+		set_config_value "@omt_display_mode" "$saved_mode"
+	fi
+	if [ -n "$saved_full" ]; then
+		set_config_value "@omt_battery_bar_symbol_full" "$saved_full"
+	fi
+	if [ -n "$saved_empty" ]; then
+		set_config_value "@omt_battery_bar_symbol_empty" "$saved_empty"
+	fi
+	if [ -n "$saved_preset_default" ]; then
+		set_config_value "@omt_display_preset_default" "$saved_preset_default"
+	fi
+	if [ -n "$saved_preset" ]; then
+		set_config_value "@omt_display_preset" "$saved_preset"
+	else
+		set_config_value "@omt_display_preset" "$saved_preset_default"
+	fi
 	"$tmux_bin" "${socket_args[@]}" set-option -g @omt_theme_branch "$branch" >/dev/null 2>&1 || true
+	[ -n "$saved_mode" ] && tmux_set @omt_display_mode "$saved_mode"
+	[ -n "$saved_full" ] && tmux_set @omt_battery_bar_symbol_full "$saved_full"
+	[ -n "$saved_empty" ] && tmux_set @omt_battery_bar_symbol_empty "$saved_empty"
+	[ -n "$saved_preset_default" ] && tmux_set @omt_display_preset_default "$saved_preset_default"
+	if [ -n "$saved_preset" ]; then
+		tmux_set @omt_display_preset "$saved_preset"
+	else
+		tmux_set @omt_display_preset "$saved_preset_default"
+	fi
 	reload_tmux
 	if [ -x "$tmux_perf_dir/refresh-battery-bar.sh" ]; then
 		"$tmux_perf_dir/refresh-battery-bar.sh" >/dev/null 2>&1 || true
@@ -301,6 +361,25 @@ display_preset_set() {
 	printf 'display_preset=%s\n' "$preset"
 }
 
+display_preset_save_default() {
+	local preset="${1:-}"
+	if [ -z "$preset" ]; then
+		preset="$(display_preset_current)"
+	fi
+	case "$preset" in
+	auto | full | compact | micro) ;;
+	*) die "unknown display preset: $preset" ;;
+	esac
+	set_config_value "@omt_display_preset_default" "$preset"
+	sync_runtime_scripts
+	tmux_set @omt_display_preset_default "$preset"
+	printf 'display_preset_default=%s\n' "$preset"
+}
+
+display_preset_reset_default() {
+	display_preset_save_default auto
+}
+
 usage() {
 	cat <<'EOF'
 Usage:
@@ -313,8 +392,10 @@ Usage:
   omtmux display preset list
   omtmux display preset get
   omtmux display preset set <auto|full|compact|micro>
+  omtmux display preset save-default [auto|full|compact|micro]
+  omtmux display preset reset-default
   omtmux display preview --width <n>
-  omtmux doctor
+  omtmux doctor [--width <n>] [--preset <name>] [--all-widths] [--json]
 EOF
 }
 
@@ -360,6 +441,14 @@ display)
 		list) display_preset_list ;;
 		get) display_preset_current ;;
 		set) [ $# -ge 4 ] || die "missing preset"; display_preset_set "$4" ;;
+		save-default)
+			if [ $# -ge 4 ]; then
+				display_preset_save_default "$4"
+			else
+				display_preset_save_default
+			fi
+			;;
+		reset-default) display_preset_reset_default ;;
 		*) usage; exit 1 ;;
 		esac
 		;;
