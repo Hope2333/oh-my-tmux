@@ -16,6 +16,7 @@ fi
 preview_width=""
 preview_preset=""
 all_widths=0
+json_output=0
 while [ $# -gt 0 ]; do
 	case "$1" in
 	--width)
@@ -30,9 +31,13 @@ while [ $# -gt 0 ]; do
 		all_widths=1
 		shift
 		;;
+	--json)
+		json_output=1
+		shift
+		;;
 	-h|--help)
 		cat <<'EOF'
-Usage: doctor.sh [--width N] [--preset auto|full|compact|micro] [--all-widths]
+Usage: doctor.sh [--width N] [--preset auto|full|compact|micro] [--all-widths] [--json]
 EOF
 		exit 0
 		;;
@@ -49,6 +54,16 @@ tmux_get() {
 
 tmux_msg() {
 	"$tmux_bin" "${socket_args[@]}" display-message -p "$1" 2>/dev/null || true
+}
+
+json_escape() {
+	local value="${1:-}"
+	value=${value//\\/\\\\}
+	value=${value//\"/\\\"}
+	value=${value//$'\n'/\\n}
+	value=${value//$'\r'/\\r}
+	value=${value//$'\t'/\\t}
+	printf '%s' "$value"
 }
 
 render_preview() {
@@ -100,6 +115,39 @@ case "$status_right" in
 	hotpath_state="dirty"
 	;;
 esac
+
+if [ "$json_output" -eq 1 ]; then
+	printf '{\n'
+	printf '  "socket_path": "%s",\n' "$(json_escape "${socket_path:-<none>}")"
+	printf '  "server_pid": "%s",\n' "$(json_escape "${server_pid:-<none>}")"
+	printf '  "hotpath": "%s",\n' "$(json_escape "$hotpath_state")"
+	printf '  "battery_charge": "%s",\n' "$(json_escape "$(tmux_get @battery_charge)")"
+	printf '  "battery_percentage": "%s",\n' "$(json_escape "$(tmux_get @battery_percentage)")"
+	printf '  "battery_status": "%s",\n' "$(json_escape "$(tmux_get @battery_status)")"
+	printf '  "omt_battery_bar": "%s",\n' "$(json_escape "$(tmux_get @omt_battery_bar)")"
+	printf '  "omt_battery_pct": "%s",\n' "$(json_escape "$(tmux_get @omt_battery_pct)")"
+	printf '  "omt_hostname": "%s",\n' "$(json_escape "$(tmux_msg '#{?@omt_hostname,#{@omt_hostname},#h}')")"
+	printf '  "omt_theme_branch": "%s",\n' "$(json_escape "${theme_branch:-<none>}")"
+	printf '  "omt_status_compact": "%s",\n' "$(json_escape "$(tmux_get @omt_status_compact)")"
+	printf '  "omt_status_compact_tail": "%s",\n' "$(json_escape "$(tmux_get @omt_status_compact_tail)")"
+	printf '  "omt_status_tail": "%s",\n' "$(json_escape "$(tmux_get @omt_status_tail)")"
+	printf '  "omt_status_tail_compact_prefix": "%s",\n' "$(json_escape "$(tmux_get @omt_status_tail_compact_prefix)")"
+	printf '  "omt_status_tail_full_template": "%s",\n' "$(json_escape "$(tmux_get @omt_status_tail_full_template)")"
+	printf '  "expanded_status_tail": "%s",\n' "$(json_escape "${expanded_status_tail:-<none>}")"
+	printf '  "client_width_floor": "%s",\n' "$(json_escape "${client_width_floor:-<none>}")"
+	printf '  "mouse": "%s",\n' "$(json_escape "${mouse_state:-<none>}")"
+	printf '  "preview_width": "%s",\n' "$(json_escape "${preview_width:-<none>}")"
+	printf '  "preview_preset": "%s",\n' "$(json_escape "${preview_preset}")"
+	printf '  "hooks": "%s",\n' "$(json_escape "${hooks:-<none>}")"
+	printf '  "clients": "%s",\n' "$(json_escape "${attached_clients:-<none>}")"
+	printf '  "status_left": "%s",\n' "$(json_escape "${status_left:-<none>}")"
+	printf '  "status_right": "%s",\n' "$(json_escape "${status_right:-<none>}")"
+	printf '  "preview": "%s",\n' "$(json_escape "${preview_output:-<none>}")"
+	printf '  "all_widths": "%s",\n' "$(json_escape "${all_widths_output:-}")"
+	printf '  "processes": "%s"\n' "$(json_escape "${daemon_ps:-<none>}")"
+	printf '}\n'
+	exit 0
+fi
 
 printf 'socket_path=%s\n' "${socket_path:-<none>}"
 printf 'server_pid=%s\n' "${server_pid:-<none>}"
