@@ -396,7 +396,85 @@ Usage:
   omtmux display preset reset-default
   omtmux display preview --width <n>
   omtmux doctor [--width <n>] [--preset <name>] [--all-widths] [--json]
+  omtmux verify
 EOF
+}
+
+render_value_get() {
+	local width="$1"
+	local key="$2"
+	local preset="${3:-auto}"
+	local output
+
+	output="$(bash "$tmux_perf_dir/render-status.sh" --width "$width" --preset "$preset" 2>/dev/null || true)"
+	printf '%s\n' "$output" | awk -F= -v key="$key" '$1 == key { print $2; exit }'
+}
+
+verify_expect() {
+	local label="$1"
+	local actual="$2"
+	local expected="$3"
+	if [ "$actual" != "$expected" ]; then
+		printf 'FAIL %s expected=%s actual=%s\n' "$label" "$expected" "$actual" >&2
+		return 1
+	fi
+	printf 'PASS %s=%s\n' "$label" "$actual"
+}
+
+verify_command() {
+	local failures=0
+	local doctor_output hotpath mouse mode56 mode72 mode80 mode96 mode120
+	local host56 host72 host80 bar80 bar96 date120 user96 status_right
+
+	doctor_output="$(bash "$tmux_perf_dir/doctor.sh" 2>/dev/null || true)"
+	hotpath="$(printf '%s\n' "$doctor_output" | awk -F= '$1=="hotpath"{print $2; exit}')"
+	mouse="$(printf '%s\n' "$doctor_output" | awk -F= '$1=="mouse"{print $2; exit}')"
+	status_right="$("$tmux_bin" "${socket_args[@]}" show-option -gv status-right 2>/dev/null || true)"
+
+	verify_expect "hotpath" "${hotpath:-<none>}" "clean" || failures=$((failures + 1))
+	verify_expect "mouse" "${mouse:-<none>}" "on" || failures=$((failures + 1))
+
+	case "$status_right" in
+	*"cut -c3-"*|*"sh -s _battery_status"*|*"battery-bar-worker"*)
+		printf 'FAIL status-right contains legacy hotpath\n' >&2
+		failures=$((failures + 1))
+		;;
+	*)
+		printf 'PASS status-right=clean\n'
+		;;
+	esac
+
+	mode56="$(render_value_get 56 mode auto)"
+	mode72="$(render_value_get 72 mode auto)"
+	mode80="$(render_value_get 80 mode auto)"
+	mode96="$(render_value_get 96 mode auto)"
+	mode120="$(render_value_get 120 mode auto)"
+	host56="$(render_value_get 56 show_host auto)"
+	host72="$(render_value_get 72 show_host auto)"
+	host80="$(render_value_get 80 show_host auto)"
+	bar80="$(render_value_get 80 show_battery_bar auto)"
+	bar96="$(render_value_get 96 show_battery_bar auto)"
+	user96="$(render_value_get 96 show_user auto)"
+	date120="$(render_value_get 120 show_date auto)"
+
+	verify_expect "width56.mode" "${mode56:-<none>}" "micro" || failures=$((failures + 1))
+	verify_expect "width72.mode" "${mode72:-<none>}" "compact" || failures=$((failures + 1))
+	verify_expect "width80.mode" "${mode80:-<none>}" "full" || failures=$((failures + 1))
+	verify_expect "width96.mode" "${mode96:-<none>}" "full" || failures=$((failures + 1))
+	verify_expect "width120.mode" "${mode120:-<none>}" "full" || failures=$((failures + 1))
+	verify_expect "width56.show_host" "${host56:-<none>}" "0" || failures=$((failures + 1))
+	verify_expect "width72.show_host" "${host72:-<none>}" "1" || failures=$((failures + 1))
+	verify_expect "width80.show_host" "${host80:-<none>}" "1" || failures=$((failures + 1))
+	verify_expect "width80.show_battery_bar" "${bar80:-<none>}" "0" || failures=$((failures + 1))
+	verify_expect "width96.show_battery_bar" "${bar96:-<none>}" "1" || failures=$((failures + 1))
+	verify_expect "width96.show_user" "${user96:-<none>}" "1" || failures=$((failures + 1))
+	verify_expect "width120.show_date" "${date120:-<none>}" "1" || failures=$((failures + 1))
+
+	if [ "$failures" -ne 0 ]; then
+		printf 'verify=failed count=%s\n' "$failures" >&2
+		return 1
+	fi
+	printf 'verify=ok\n'
 }
 
 cmd="${1:-}"
@@ -462,6 +540,9 @@ display)
 doctor)
 	shift
 	exec bash "$tmux_perf_dir/doctor.sh" "$@"
+	;;
+verify)
+	verify_command
 	;;
 ""|-h|--help)
 	usage
