@@ -642,9 +642,9 @@ verify_matrix_command() {
 		[ "$uses_separator" = true ] || failures=$((failures + 1))
 
 		if [ "$branch" = arc-light ] || [ "$branch" = arc-glass-light ]; then
-			[ "$color6" = "#fbfbfc" ] || failures=$((failures + 1))
+			[ "$color6" = "#f5f6f7" ] || failures=$((failures + 1))
 			[ "$color7" = "#5c616c" ] || failures=$((failures + 1))
-			printf '%s\n' "$tail_prefix" | rg -q 'bg=#fbfbfc' || failures=$((failures + 1))
+			printf '%s\n' "$tail_prefix" | rg -q 'bg=#f5f6f7' || failures=$((failures + 1))
 		fi
 
 		if [ "$json" -eq 1 ]; then
