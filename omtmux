@@ -589,7 +589,24 @@ branch_file_value() {
 branch_contains() {
 	local branch="$1"
 	local pattern="$2"
-	git -C "$repo_root" show "$branch:.tmux.conf.local" 2>/dev/null | rg -q "$pattern"
+	local content
+	content="$(git -C "$repo_root" show "$branch:.tmux.conf.local" 2>/dev/null || true)"
+	printf '%s\n' "$content" | rg -q "$pattern"
+}
+
+branch_theme_color() {
+	local branch="$1"
+	local key="$2"
+	git -C "$repo_root" show "$branch:.tmux.conf.local" 2>/dev/null |
+	awk -v key="$key" '
+		index($0, key "=") == 1 {
+			if (match($0, /"#[^"]+"/)) {
+				value = substr($0, RSTART + 1, RLENGTH - 2)
+				print value
+				exit
+			}
+		}
+	'
 }
 
 verify_matrix_command() {
@@ -607,8 +624,8 @@ verify_matrix_command() {
 		branch_contains "$branch" 'set -g mouse on' && mouse_on=true
 		branch_contains "$branch" '#\{E:@omt_status_tail\}' && uses_expand=true
 		branch_contains "$branch" '@omt_tail_separator' && uses_separator=true
-		color6="$(git -C "$repo_root" show "$branch:.tmux.conf.local" | awk -F= '/tmux_conf_theme_colour_6=/{gsub(/"|[[:space:]]/, "", $2); print $2; exit}')"
-		color7="$(git -C "$repo_root" show "$branch:.tmux.conf.local" | awk -F= '/tmux_conf_theme_colour_7=/{gsub(/"|[[:space:]]/, "", $2); print $2; exit}')"
+		color6="$(branch_theme_color "$branch" "tmux_conf_theme_colour_6")"
+		color7="$(branch_theme_color "$branch" "tmux_conf_theme_colour_7")"
 		tail_prefix="$(branch_file_value "$branch" "@omt_status_tail_compact_prefix")"
 
 		if [ "$json" -eq 0 ]; then
