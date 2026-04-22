@@ -407,11 +407,13 @@ set-hook -g session-created "run-shell -b '$HOME/.config/tmux/omt-perf/apply.sh'
 set -g mouse on
 set -g status-style "fg=#5c616c,bg=#f5f6f7"
 set -g window-status-style "fg=#5c616c,bg=#f5f6f7"
-set -g window-status-current-style "fg=#ffffff,bg=#5294e2,bold"
+set -g window-status-current-style "fg=#383c4a,bg=#5294e2,bold"
+set -g window-active-style "fg=#383c4a,bg=#fbfbfc"
+set -g window-style "fg=#383c4a,bg=#fbfbfc"
 set -g message-style "fg=#ffffff,bg=#f0ad4e,bold"
 set -g message-command-style "fg=#ffffff,bg=#5294e2,bold"
-set -g pane-border-style "fg=#cfd6e6"
-set -g pane-active-border-style "fg=#5294e2"
+set -g pane-border-style "fg=#cfd6e6,bg=#fbfbfc"
+set -g pane-active-border-style "fg=#5294e2,bg=#fbfbfc"
 
 unbind r
 bind r run-shell -b "$HOME/.config/tmux/omt-perf/reload.sh"
