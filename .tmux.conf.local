@@ -85,24 +85,24 @@ tmux_conf_24b_colour=auto
 #   - tmux_conf_theme_synchronized
 tmux_conf_theme=enabled
 
-# Arc-Dark theme
-tmux_conf_theme_colour_1="#2f343f"    # dark panel
-tmux_conf_theme_colour_2="#2b2e39"    # border dark
-tmux_conf_theme_colour_3="#8b949e"    # text gray
-tmux_conf_theme_colour_4="#5294e2"    # Arc blue
-tmux_conf_theme_colour_5="#f0ad4e"    # Arc orange
-tmux_conf_theme_colour_6="#2f343f"    # dark panel
-tmux_conf_theme_colour_7="#d3dae3"    # light text
-tmux_conf_theme_colour_8="#2f343f"    # dark panel
-tmux_conf_theme_colour_9="#f0ad4e"    # Arc orange
-tmux_conf_theme_colour_10="#e95420"   # Arc red-orange
-tmux_conf_theme_colour_11="#40c057"   # Arc green
-tmux_conf_theme_colour_12="#8b949e"   # text gray
-tmux_conf_theme_colour_13="#d3dae3"   # light text
-tmux_conf_theme_colour_14="#2f343f"   # dark panel
-tmux_conf_theme_colour_15="#2f343f"   # dark panel
+# default theme
+tmux_conf_theme_colour_1="#080808"    # dark gray
+tmux_conf_theme_colour_2="#303030"    # gray
+tmux_conf_theme_colour_3="#8a8a8a"    # light gray
+tmux_conf_theme_colour_4="#00afff"    # light blue
+tmux_conf_theme_colour_5="#ffff00"    # yellow
+tmux_conf_theme_colour_6="#080808"    # dark gray
+tmux_conf_theme_colour_7="#e4e4e4"    # white
+tmux_conf_theme_colour_8="#080808"    # dark gray
+tmux_conf_theme_colour_9="#ffff00"    # yellow
+tmux_conf_theme_colour_10="#ff00af"   # pink
+tmux_conf_theme_colour_11="#5fff00"   # green
+tmux_conf_theme_colour_12="#8a8a8a"   # light gray
+tmux_conf_theme_colour_13="#e4e4e4"   # white
+tmux_conf_theme_colour_14="#080808"   # dark gray
+tmux_conf_theme_colour_15="#080808"   # dark gray
 tmux_conf_theme_colour_16="#d70000"   # red
-tmux_conf_theme_colour_17="#d3dae3"   # light text
+tmux_conf_theme_colour_17="#e4e4e4"   # white
 
 # default theme (ansi)
 #tmux_conf_theme_colour_1="colour0"
@@ -123,15 +123,17 @@ tmux_conf_theme_colour_17="#d3dae3"   # light text
 #tmux_conf_theme_colour_16="colour1"
 #tmux_conf_theme_colour_17="colour15"
 
-# window style (ArcGlass-Dark: transparent bg, light text)
-tmux_conf_theme_window_fg="#d3dae3"
+# window style
+tmux_conf_theme_window_fg="default"
 tmux_conf_theme_window_bg="default"
 
-# highlight focused pane
+# highlight focused pane, possible values are:
+#   - true
+#   - false (default)
 tmux_conf_theme_highlight_focused_pane=false
 
 # focused pane colours:
-tmux_conf_theme_focused_pane_bg="default"
+tmux_conf_theme_focused_pane_bg="$tmux_conf_theme_colour_2"
 
 # pane border style, possible values are:
 #   - thin (default)
@@ -168,6 +170,7 @@ tmux_conf_theme_mode_attr="bold"
 tmux_conf_theme_status_fg="$tmux_conf_theme_colour_3"
 tmux_conf_theme_status_bg="$tmux_conf_theme_colour_1"
 tmux_conf_theme_status_attr="none"
+tmux_conf_theme_status_bg="#2f343f"
 
 # terminal title
 #   - built-in variables are:
@@ -271,14 +274,14 @@ tmux_conf_theme_status_left=" ❐ #S | ↑#{?uptime_y, #{uptime_y}y,}#{?uptime_d
 #tmux_conf_theme_status_left=" ❐ #S | ↑#{?uptime_y, #{uptime_y}y,}#{?uptime_d, #{uptime_d}d,}#{?uptime_h, #{uptime_h}h,}#{?uptime_m, #{uptime_m}m,} | #{pretty_pane_current_path} "
 tmux_conf_theme_status_right=" #{prefix}#{mouse}#{pairing}#{synchronized}#{?@omt_battery_status,#{@omt_battery_status},}#{?@omt_battery_pct, #{@omt_battery_pct},}#{?@omt_battery_bar, #{@omt_battery_bar},} #[fg=#8b949e,bg=#2f343f]#{?@omt_tail_separator,#{@omt_tail_separator},|}#[default] %R#{E:@omt_status_tail}"
 
-# status left style (ArcGlass-Dark: dark panel with blue accent)
-tmux_conf_theme_status_left_fg="$tmux_conf_theme_colour_7,$tmux_conf_theme_colour_4,$tmux_conf_theme_colour_3"
-tmux_conf_theme_status_left_bg="$tmux_conf_theme_colour_6,$tmux_conf_theme_colour_6,$tmux_conf_theme_colour_6"
+# status left style
+tmux_conf_theme_status_left_fg="$tmux_conf_theme_colour_6,$tmux_conf_theme_colour_7,$tmux_conf_theme_colour_8"
+tmux_conf_theme_status_left_bg="$tmux_conf_theme_colour_9,$tmux_conf_theme_colour_10,$tmux_conf_theme_colour_11"
 tmux_conf_theme_status_left_attr="bold,none,none"
 
 # status right style
-tmux_conf_theme_status_right_fg="$tmux_conf_theme_colour_3,$tmux_conf_theme_colour_7,$tmux_conf_theme_colour_14"
-tmux_conf_theme_status_right_bg="$tmux_conf_theme_colour_6,$tmux_conf_theme_colour_6,$tmux_conf_theme_colour_6"
+tmux_conf_theme_status_right_fg="#8b949e,#d3dae3,#2f343f"
+tmux_conf_theme_status_right_bg="#2f343f,#2f343f,#2f343f"
 tmux_conf_theme_status_right_attr="none,none,bold"
 
 # pairing indicator
@@ -322,8 +325,12 @@ tmux_conf_battery_bar_symbol_empty="◻"
 #   - a number, e.g. 5
 tmux_conf_battery_bar_length="auto"
 
-# battery bar palette - single color Arc blue (red when low)
-tmux_conf_battery_bar_palette="#5294e2,#5294e2,#2f343f"
+# battery bar palette, possible values are:
+#   - gradient (default)
+#   - heat
+#   - "colour_full_fg,colour_empty_fg,colour_bg"
+#   - gradient(colour_fg_1,colour_fg_2,...,colour_fg_n)
+tmux_conf_battery_bar_palette="gradient"
 #tmux_conf_battery_bar_palette="#d70000,#e4e4e4,#000000"   # red, white, black
 #tmux_conf_battery_bar_palette="gradient(#00afff,#47a2ff,#7c91ff,#ac7afb,#d65be2,#e163df,#eb6cdd,#f475db,#ec9ff1,#eac3fe,#efe2ff,#ffffff)"
 
@@ -389,8 +396,8 @@ set -g @omt_battery_bar_small_length "4"
 set -g @omt_battery_bar_medium_under "120"
 set -g @omt_battery_bar_small_under "96"
 set -g @omt_battery_bar_hide_under "80"
-set -g @omt_battery_bar_palette "#5294e2,#5294e2,#2f343f"
-set -g @omt_battery_bar_low_palette "#d70000,#d70000,#2f343f"
+set -g @omt_battery_bar_palette "gradient"
+set -g @omt_battery_bar_low_palette "heat"
 set -g @omt_battery_bar_symbol_empty "◻"
 set -g @omt_battery_bar_symbol_full "◼"
 set -g @omt_tail_separator "|"
