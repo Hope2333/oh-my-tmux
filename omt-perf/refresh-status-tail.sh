@@ -81,8 +81,10 @@ hostname_short="$("$tmux_bin" "${socket_args[@]}" display-message -p '#{?@omt_ho
 
 compact_prefix="$(tmux_get @omt_status_tail_compact_prefix)"
 full_template="$(tmux_get @omt_status_tail_full_template)"
+tail_separator="$(tmux_get @omt_tail_separator)"
 [ -n "$compact_prefix" ] || compact_prefix=" |"
 [ -n "$full_template" ] || full_template=" | %d %b | #{@omt_username}#{@omt_root} | #{?@omt_hostname,#{@omt_hostname},#h}"
+[ -n "$tail_separator" ] || tail_separator="|"
 
 case "$preset" in
 auto)
@@ -95,13 +97,13 @@ full)
 	;;
 compact)
 	tmux_set @omt_status_compact 1
-	tmux_set @omt_status_compact_tail " | $(session_hint "$session_name" 6) | $(truncate_ascii "$hostname_short" 6)"
+	tmux_set @omt_status_compact_tail " ${tail_separator} $(session_hint "$session_name" 6) ${tail_separator} $(truncate_ascii "$hostname_short" 6)"
 	tmux_set @omt_status_tail "${compact_prefix}$(tmux_get @omt_status_compact_tail)"
 	exit 0
 	;;
 micro)
 	tmux_set @omt_status_compact 1
-	tmux_set @omt_status_compact_tail " | $(session_hint "$session_name" 4)"
+	tmux_set @omt_status_compact_tail " ${tail_separator} $(session_hint "$session_name" 4)"
 	tmux_set @omt_status_tail "${compact_prefix}$(tmux_get @omt_status_compact_tail)"
 	exit 0
 	;;
@@ -113,11 +115,11 @@ esac
 
 if [ "$width" -lt 64 ]; then
 	tmux_set @omt_status_compact 1
-	tmux_set @omt_status_compact_tail " | $(session_hint "$session_name" 4)"
+	tmux_set @omt_status_compact_tail " ${tail_separator} $(session_hint "$session_name" 4)"
 	tmux_set @omt_status_tail "${compact_prefix}$(tmux_get @omt_status_compact_tail)"
 elif [ "$width" -lt 80 ]; then
 	tmux_set @omt_status_compact 1
-	tmux_set @omt_status_compact_tail " | $(session_hint "$session_name" 6) | $(truncate_ascii "$hostname_short" 6)"
+	tmux_set @omt_status_compact_tail " ${tail_separator} $(session_hint "$session_name" 6) ${tail_separator} $(truncate_ascii "$hostname_short" 6)"
 	tmux_set @omt_status_tail "${compact_prefix}$(tmux_get @omt_status_compact_tail)"
 else
 	tmux_unset @omt_status_compact

@@ -81,6 +81,19 @@ render_preview() {
 	bash "$script_dir/render-status.sh" "${args[@]}" 2>/dev/null || true
 }
 
+preview_field() {
+	local output="$1"
+	local key="$2"
+	printf '%s\n' "$output" | awk -F= -v key="$key" '$1 == key { print $2; exit }'
+}
+
+preview_text() {
+	local output="$1"
+	printf '%s\n' "$output" | awk '
+		/^\[preview\]$/ { getline; print; exit }
+	'
+}
+
 status_right="$(tmux_get status-right)"
 status_left="$(tmux_get status-left)"
 socket_path="$(tmux_msg '#{socket_path}')"
@@ -100,6 +113,19 @@ if [ -z "$preview_preset" ]; then
 	preview_preset="auto"
 fi
 preview_output="$(render_preview "$preview_width" "$preview_preset")"
+preview_mode="$(preview_field "$preview_output" mode)"
+preview_show_battery_pct="$(preview_field "$preview_output" show_battery_pct)"
+preview_show_date="$(preview_field "$preview_output" show_date)"
+preview_show_user="$(preview_field "$preview_output" show_user)"
+preview_show_battery_bar="$(preview_field "$preview_output" show_battery_bar)"
+preview_show_battery_status="$(preview_field "$preview_output" show_battery_status)"
+preview_show_session="$(preview_field "$preview_output" show_session)"
+preview_show_host="$(preview_field "$preview_output" show_host)"
+preview_bar_length="$(preview_field "$preview_output" battery_bar_length)"
+preview_bar_palette="$(preview_field "$preview_output" battery_bar_palette)"
+preview_host_display="$(preview_field "$preview_output" host_display)"
+preview_session_display="$(preview_field "$preview_output" session_display)"
+preview_text_line="$(preview_text "$preview_output")"
 
 all_widths_output=""
 if [ "$all_widths" -eq 1 ]; then
@@ -148,8 +174,21 @@ if [ "$json_output" -eq 1 ]; then
 	printf '  "preview": {\n'
 	printf '    "width": "%s",\n' "$(json_escape "${preview_width:-<none>}")"
 	printf '    "preset": "%s",\n' "$(json_escape "${preview_preset}")"
-	printf '    "text": "%s",\n' "$(json_escape "${preview_output:-<none>}")"
-	printf '    "all_widths": "%s"\n' "$(json_escape "${all_widths_output:-}")"
+	printf '    "mode": "%s",\n' "$(json_escape "${preview_mode:-<none>}")"
+	printf '    "show_battery_pct": "%s",\n' "$(json_escape "${preview_show_battery_pct:-<none>}")"
+	printf '    "show_date": "%s",\n' "$(json_escape "${preview_show_date:-<none>}")"
+	printf '    "show_user": "%s",\n' "$(json_escape "${preview_show_user:-<none>}")"
+	printf '    "show_battery_bar": "%s",\n' "$(json_escape "${preview_show_battery_bar:-<none>}")"
+	printf '    "show_battery_status": "%s",\n' "$(json_escape "${preview_show_battery_status:-<none>}")"
+	printf '    "show_session": "%s",\n' "$(json_escape "${preview_show_session:-<none>}")"
+	printf '    "show_host": "%s",\n' "$(json_escape "${preview_show_host:-<none>}")"
+	printf '    "battery_bar_length": "%s",\n' "$(json_escape "${preview_bar_length:-<none>}")"
+	printf '    "battery_bar_palette": "%s",\n' "$(json_escape "${preview_bar_palette:-<none>}")"
+	printf '    "host_display": "%s",\n' "$(json_escape "${preview_host_display:-<none>}")"
+	printf '    "session_display": "%s",\n' "$(json_escape "${preview_session_display:-<none>}")"
+	printf '    "text": "%s",\n' "$(json_escape "${preview_text_line:-<none>}")"
+	printf '    "raw": "%s",\n' "$(json_escape "${preview_output:-<none>}")"
+	printf '    "all_widths_raw": "%s"\n' "$(json_escape "${all_widths_output:-}")"
 	printf '  },\n'
 	printf '  "runtime": {\n'
 	printf '    "client_width_floor": "%s",\n' "$(json_escape "${client_width_floor:-<none>}")"
