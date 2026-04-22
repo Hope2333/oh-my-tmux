@@ -1,139 +1,61 @@
 # Oh My Tmux - Lite Edition
 
-> A lightweight, performance-optimized tmux configuration based on [Oh My Tmux!](https://github.com/gpakosz/.tmux)
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![License: WTFPL](https://img.shields.io/badge/License-WTFPL-blue.svg)](http://www.wtfpl.net/)
+A lightweight, performance-optimized tmux configuration based on [Oh My Tmux!](https://github.com/gpakosz/.tmux).
 
 ## Features
 
-- ⚡ **Performance Optimized**: Status caches eliminate redundant shell calls on every status refresh while keeping the battery bar visible
-- 🎨 **Themed Status Bar**: Clean, informative status line with battery, uptime, username, and hostname
-- 🔧 **Easy Customization**: Override settings in `.tmux.conf.local` without touching the main config
+- ⚡ **Performance Optimized**: Status caches eliminate redundant shell calls while keeping the battery bar visible
+- 🎨 **Themed Status Bar**: Clean, informative status line with battery, uptime, and SSH info
+- 🔧 **Easy Customization**: Override settings in `.tmux.conf.local`
 - 🖱️ **Mouse Support**: Click to select panes, scroll to navigate history
-- 🔌 **TPM Ready**: Seamless integration with Tmux Plugin Manager
-- 🐚 **SSH Aware**: Smart username/hostname display based on SSH connections
 
-## Installation
-
-### One-line Install
+## Quick Start
 
 ```bash
-curl -fsSL "https://github.com/Hope2333/oh-my-tmux/raw/refs/heads/main/install.sh" | bash
-```
+# Clone the light branch
+git clone -b light --depth=1 https://github.com/Hope2333/oh-my-tmux.git ~/.local/share/tmux/oh-my-tmux
 
-### Manual Install
-
-```bash
-# 1. Clone the desired theme branch
-git clone -b lite --depth=1 https://github.com/Hope2333/oh-my-tmux.git ~/.local/share/tmux/oh-my-tmux
-
-# 2. Create symlink (XDG config style)
+# Create symlink
 mkdir -p ~/.config/tmux
 ln -sf ~/.local/share/tmux/oh-my-tmux/.tmux.conf ~/.config/tmux/tmux.conf
 
-# 3. Copy local config template
-cp ~/.local/share/tmux/oh-my-tmux/.tmux.conf.local ~/.config/tmux/tmux.conf.local
-
-# 4. Start tmux
+# Start tmux
 tmux
 ```
 
-### Available Themes
+## Structure
 
-| Branch | Preview | Description |
-|---|---|---|
-| `lite` | 🌑 Default Dark | Original dark theme with light blue accents |
-| `arc-dark` | 🌃 Arc-Dark | Dark theme with Arc GTK colors (#383c4a bg, #5294e2 blue) |
-| `arc-light` | ☀️ Arc-Light | Light theme with Arc GTK colors (#f5f6f7 bg, #5294e2 blue) |
-| `arc-glass-dark` | 🪟 ArcGlass-Dark | **Transparent** dark theme, status bar only (#5294e2 blue) |
-| `arc-glass-light` | 🪟 ArcGlass-Light | **Transparent** light theme, status bar only (#5294e2 blue) |
-
-To install a specific theme, replace `-b lite` with `-b arc-dark` or `-b arc-light` in the clone command above.
-
-### Requirements
-
-- tmux **`>= 2.4`** running inside Linux, Mac, OpenBSD, Cygwin or WSL
-- `awk`, `perl`, `sed`, `python3` (for status bar patching)
-- Outside of tmux, `$TERM` should be set to `xterm-256color` or `tmux-256color`
-
-## Configuration
-
-### Customizing
-
-🚨 **You should never alter the main `.tmux.conf` file.** Instead, edit `~/.config/tmux/tmux.conf.local` (or `~/.tmux.conf.local`).
-
-Press `<prefix> + e` to open the local config in your editor. Changes take effect on next tmux start or when you reload.
-
-### Reloading
-
-- Press `<prefix> + r` to reload configuration
-- Or run: `tmux source ~/.config/tmux/tmux.conf`
-
-### Key Bindings
-
-| Binding | Action |
-|---|---|
-| `C-b` / `C-a` | Prefix keys |
-| `-` | Split window vertically |
-| `_` | Split window horizontally |
-| `h/j/k/l` | Navigate panes |
-| `H/J/K/L` | Resize panes |
-| `+` | Maximize/restore current pane |
-| `m` | Toggle mouse mode |
-| `r` | Reload configuration |
-| `Enter` | Enter copy mode |
-| `v` / `C-v` | Begin selection / rectangle toggle (copy mode) |
-| `y` | Copy selection to clipboard (copy mode) |
+```
+light branch:
+├── .tmux.conf          # Main config (from gpakosz/.tmux)
+├── .tmux.conf.local    # Custom overrides
+└── omt-perf/           # Performance optimization scripts
+    ├── apply.sh
+    ├── battery-bar-worker.sh
+    ├── metrics-daemon.sh
+    ├── refresh-client-panes.sh
+    ├── reload.sh
+    ├── update-pane-cache.sh
+    └── README.md
+```
 
 ## Performance Optimizations
 
-This lite edition includes the `omt-perf/` module:
+The `omt-perf/` module provides:
 
-| Module | Description |
-|---|---|
-| **Pane Identity Cache** | Caches username/hostname per pane instead of querying on every status refresh |
-| **Battery Metrics Cache** | Caches battery status, percentage, and bar in tmux options |
-| **Low-Frequency Metrics** | Battery and uptime updated every 75s instead of every status interval |
-| **Legacy Loop Cleanup** | Stops the default oh-my-tmux background loops that run every 60s |
-| **Resize Trigger** | `client-resized` refreshes the battery bar using width tiers without touching the rest of the status line |
-| **Compact Tail** | Sub-80 widths switch the right tail to session-first compact labels |
-
-See [PERFORMANCE-PLAN.md](PERFORMANCE-PLAN.md) for the branch-wide optimization plan and verification gates.
-
-## TPM Plugins
-
-To enable plugins, edit `~/.config/tmux/tmux.conf.local` and add:
-
-```bash
-set -g @plugin 'tmux-plugins/tpm'
-set -g @plugin 'tmux-plugins/tmux-resurrect'
-# ... more plugins
-```
-
-Then:
-- `<prefix> + I` - Install plugins
-- `<prefix> + u` - Update plugins
-- `<prefix> + Alt + u` - Uninstall plugins
+1. **Pane Identity Cache**: Caches username/hostname per pane instead of querying on every status refresh
+2. **Battery Metrics Cache**: Caches battery status, percentage, and bar in tmux options
+3. **Low-Frequency Metrics**: Battery and uptime updated every 75s instead of every status interval
+4. **Legacy Loop Cleanup**: Stops the default oh-my-tmux background loops
+5. **Resize Trigger**: `client-resized` refreshes the battery bar using width tiers without touching the rest of the status line
+6. **Compact Tail**: Sub-80 widths switch the right tail to session-first compact labels
 
 ## Troubleshooting
 
-### Status bar shows empty username/hostname
+Inspect runtime state:
 
-Run `~/.config/tmux/omt-perf/refresh-client-panes.sh` to force refresh pane caches.
-
-### Performance issues
-
-1. Check for stale background processes: `ps aux | grep tmux | grep -v grep`
-2. Kill legacy loops: `pkill -f "cut -c3-.*_battery_info"`
-3. Re-apply optimizations: `bash ~/.config/tmux/omt-perf/apply.sh`
-4. Inspect runtime state: `bash ~/.config/tmux/omt-perf/doctor.sh`
-
-### Colors look wrong
-
-Ensure your terminal supports 256 colors and `$TERM` is set correctly:
 ```bash
-export TERM=xterm-256color
+bash ~/.config/tmux/omt-perf/doctor.sh
 ```
 
 CLI entrypoint:
@@ -155,9 +77,11 @@ omtmux doctor --width 72
 omtmux doctor --all-widths
 omtmux doctor --json
 omtmux verify
+omtmux verify --json
+omtmux verify --matrix
 ```
 
-Available display modes: `square` (default), `rounded`, `diamond`.
+Available display modes: `square` (default), `rounded`, `diamond`. They now drive both battery bar symbols and compact-tail separators.
 Available display presets: `auto` (default), `full`, `compact`, `micro`.
 
 `omtmux theme set` now refuses to switch branches when the repo worktree is dirty unless you pass `--force`.
@@ -167,6 +91,7 @@ Available display presets: `auto` (default), `full`, `compact`, `micro`.
 `omtmux doctor --all-widths` prints the preview matrix for `56 / 64 / 72 / 80 / 96 / 120`.
 `omtmux doctor --json` emits the same runtime snapshot as structured JSON.
 `omtmux verify` runs the current hotpath and width-tier assertions against the live theme.
+`omtmux verify --json` emits the same checks as JSON, and `omtmux verify --matrix` checks every theme branch for default mouse, tail expansion, separator support, and light-theme toolbar colors.
 
 Preview a future width tier before wiring it into hooks:
 
@@ -183,11 +108,5 @@ Current preview rules:
 
 ## License
 
-Dual licensed under the [WTFPL v2](LICENSE.WTFPL) and the [MIT license](LICENSE.MIT), without any warranty.
-
+Dual licensed under WTFPL v2 and MIT license.
 Copyright 2012— Gregory Pakosz (@gpakosz).
-
-## Credits
-
-- Base configuration: [gpakosz/.tmux](https://github.com/gpakosz/.tmux)
-- Performance optimization: Custom `omt-perf/` module

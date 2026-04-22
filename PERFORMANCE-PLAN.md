@@ -28,7 +28,8 @@ status shell work. The status line should render from cached tmux options, while
 
 Apply the same status-cache contract to every maintained branch:
 
-- `lite`
+- `dark`
+- `light`
 - `arc-dark`
 - `arc-light`
 - `arc-glass-dark`
