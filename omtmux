@@ -641,7 +641,11 @@ verify_matrix_command() {
 		[ "$uses_expand" = true ] || failures=$((failures + 1))
 		[ "$uses_separator" = true ] || failures=$((failures + 1))
 
-		if [ "$branch" = light ] || [ "$branch" = arc-light ] || [ "$branch" = arc-glass-light ]; then
+		if [ "$branch" = light ]; then
+			[ "$color6" = "#f5f6f7" ] || failures=$((failures + 1))
+			[ "$color7" = "#4a4a4a" ] || failures=$((failures + 1))
+			printf '%s\n' "$tail_prefix" | rg -q 'bg=#f5f6f7' || failures=$((failures + 1))
+		elif [ "$branch" = arc-light ] || [ "$branch" = arc-glass-light ]; then
 			[ "$color6" = "#f5f6f7" ] || failures=$((failures + 1))
 			[ "$color7" = "#5c616c" ] || failures=$((failures + 1))
 			printf '%s\n' "$tail_prefix" | rg -q 'bg=#f5f6f7' || failures=$((failures + 1))
