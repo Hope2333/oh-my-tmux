@@ -609,10 +609,25 @@ branch_theme_color() {
 	'
 }
 
+branch_theme_value() {
+	local branch="$1"
+	local key="$2"
+	git -C "$repo_root" show "$branch:.tmux.conf.local" 2>/dev/null |
+	awk -v key="$key" '
+		index($0, key "=") == 1 {
+			sub(/^[^=]+=/, "", $0)
+			gsub(/^"/, "", $0)
+			gsub(/"$/, "", $0)
+			print $0
+			exit
+		}
+	'
+}
+
 verify_matrix_command() {
 	local json="${1:-0}"
 	local failures=0
-	local branch color6 color7 tail_prefix
+	local branch color6 color7 tail_prefix pane_bg pane_active_bg
 	local mouse_on uses_expand uses_separator
 	local results=""
 
@@ -627,6 +642,8 @@ verify_matrix_command() {
 		color6="$(branch_theme_color "$branch" "tmux_conf_theme_colour_6")"
 		color7="$(branch_theme_color "$branch" "tmux_conf_theme_colour_7")"
 		tail_prefix="$(branch_file_value "$branch" "@omt_status_tail_compact_prefix")"
+		pane_bg="$(branch_theme_value "$branch" "tmux_conf_theme_pane_border_bg")"
+		pane_active_bg="$(branch_theme_value "$branch" "tmux_conf_theme_pane_active_border_bg")"
 
 		if [ "$json" -eq 0 ]; then
 			printf '[%s]\n' "$branch"
@@ -635,6 +652,8 @@ verify_matrix_command() {
 			printf '  tail_separator=%s\n' "$uses_separator"
 			printf '  colour_6=%s\n' "${color6:-<none>}"
 			printf '  colour_7=%s\n' "${color7:-<none>}"
+			printf '  pane_border_bg=%s\n' "${pane_bg:-<none>}"
+			printf '  pane_active_border_bg=%s\n' "${pane_active_bg:-<none>}"
 		fi
 
 		[ "$mouse_on" = true ] || failures=$((failures + 1))
@@ -645,15 +664,19 @@ verify_matrix_command() {
 			[ "$color6" = "#f5f6f7" ] || failures=$((failures + 1))
 			[ "$color7" = "#4a4a4a" ] || failures=$((failures + 1))
 			printf '%s\n' "$tail_prefix" | rg -q 'bg=#f5f6f7' || failures=$((failures + 1))
+			[ "$pane_bg" = "#fbfbfc" ] || failures=$((failures + 1))
+			[ "$pane_active_bg" = "#fbfbfc" ] || failures=$((failures + 1))
 		elif [ "$branch" = arc-light ] || [ "$branch" = arc-glass-light ]; then
 			[ "$color6" = "#f5f6f7" ] || failures=$((failures + 1))
 			[ "$color7" = "#5c616c" ] || failures=$((failures + 1))
 			printf '%s\n' "$tail_prefix" | rg -q 'bg=#f5f6f7' || failures=$((failures + 1))
+			[ "$pane_bg" = "#fbfbfc" ] || failures=$((failures + 1))
+			[ "$pane_active_bg" = "#fbfbfc" ] || failures=$((failures + 1))
 		fi
 
 		if [ "$json" -eq 1 ]; then
 			results="${results}${results:+,}
-    {\"branch\":\"$branch\",\"mouse\":$mouse_on,\"tail_expand\":$uses_expand,\"tail_separator\":$uses_separator,\"colour_6\":\"$(json_escape "${color6:-}")\",\"colour_7\":\"$(json_escape "${color7:-}")\"}"
+    {\"branch\":\"$branch\",\"mouse\":$mouse_on,\"tail_expand\":$uses_expand,\"tail_separator\":$uses_separator,\"colour_6\":\"$(json_escape "${color6:-}")\",\"colour_7\":\"$(json_escape "${color7:-}")\",\"pane_border_bg\":\"$(json_escape "${pane_bg:-}")\",\"pane_active_border_bg\":\"$(json_escape "${pane_active_bg:-}")\"}"
 		fi
 	done
 
