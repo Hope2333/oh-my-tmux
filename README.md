@@ -1,4 +1,4 @@
-# Oh My Tmux - Dark Edition
+# Oh My Tmux - Light Edition
 
 A lightweight, performance-optimized tmux configuration based on [Oh My Tmux!](https://github.com/gpakosz/.tmux).
 
@@ -12,8 +12,8 @@ A lightweight, performance-optimized tmux configuration based on [Oh My Tmux!](h
 ## Quick Start
 
 ```bash
-# Clone the dark branch
-git clone -b dark --depth=1 https://github.com/Hope2333/oh-my-tmux.git ~/.local/share/tmux/oh-my-tmux
+# Clone the light branch
+git clone -b light --depth=1 https://github.com/Hope2333/oh-my-tmux.git ~/.local/share/tmux/oh-my-tmux
 
 # Create symlink
 mkdir -p ~/.config/tmux
@@ -26,7 +26,7 @@ tmux
 ## Structure
 
 ```
-dark branch:
+light branch:
 ├── .tmux.conf          # Main config (from gpakosz/.tmux)
 ├── .tmux.conf.local    # Custom overrides
 └── omt-perf/           # Performance optimization scripts
