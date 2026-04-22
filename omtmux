@@ -282,7 +282,7 @@ theme_list() {
 	local current runtime marker sync_state details
 	current="$(current_branch)"
 	runtime="$(runtime_theme_current)"
-	for branch in lite arc-dark arc-light arc-glass-dark arc-glass-light; do
+	for branch in dark light arc-dark arc-light arc-glass-dark arc-glass-light; do
 		marker=" "
 		if [ "$branch" = "$current" ]; then
 			marker="*"
@@ -300,7 +300,7 @@ theme_list() {
 }
 
 theme_names() {
-	printf '%s\n' lite arc-dark arc-light arc-glass-dark arc-glass-light
+	printf '%s\n' dark light arc-dark arc-light arc-glass-dark arc-glass-light
 }
 
 theme_set() {
@@ -432,7 +432,7 @@ usage() {
 Usage:
   omtmux theme list
   omtmux theme current
-  omtmux theme set [--force] <lite|arc-dark|arc-light|arc-glass-dark|arc-glass-light>
+  omtmux theme set [--force] <dark|light|arc-dark|arc-light|arc-glass-dark|arc-glass-light>
   omtmux display mode list
   omtmux display mode get
   omtmux display mode set <square|rounded|diamond>
@@ -616,7 +616,7 @@ verify_matrix_command() {
 	local mouse_on uses_expand uses_separator
 	local results=""
 
-	for branch in lite arc-dark arc-light arc-glass-dark arc-glass-light; do
+	for branch in dark light arc-dark arc-light arc-glass-dark arc-glass-light; do
 		mouse_on=false
 		uses_expand=false
 		uses_separator=false
