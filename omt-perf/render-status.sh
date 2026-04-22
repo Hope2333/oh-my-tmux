@@ -209,12 +209,14 @@ bar_low_palette="$(value_get @omt_battery_bar_low_palette)"
 bar_length="$(value_get @omt_battery_bar_length)"
 bar_empty="$(value_get @omt_battery_bar_symbol_empty)"
 bar_full="$(value_get @omt_battery_bar_symbol_full)"
+tail_separator="$(value_get @omt_tail_separator)"
 
 [ -n "$bar_palette" ] || bar_palette="gradient"
 [ -n "$bar_low_palette" ] || bar_low_palette="heat"
 [ -n "$bar_length" ] || bar_length="8"
 [ -n "$bar_empty" ] || bar_empty="◻"
 [ -n "$bar_full" ] || bar_full="◼"
+[ -n "$tail_separator" ] || tail_separator="|"
 [ -n "$omt_hostname" ] || omt_hostname="$(hostname -s 2>/dev/null || hostname 2>/dev/null || printf '<none>')"
 [ -n "$omt_username" ] || omt_username="$(id -un 2>/dev/null || printf '')"
 [ -n "$session_name" ] || session_name="$("$tmux_bin" "${socket_args[@]}" list-sessions -F '#{session_name}' 2>/dev/null | sed -n '1p' || true)"
@@ -337,18 +339,18 @@ fi
 if [ -n "$rendered_bar" ]; then
 	preview="${preview}${preview:+ }[bar:${rendered_bar}]"
 fi
-preview="${preview}${preview:+ }| ${time_now}"
+preview="${preview}${preview:+ }${tail_separator} ${time_now}"
 if [ "$show_date" -eq 1 ]; then
-	preview="${preview} | ${date_now}"
+	preview="${preview} ${tail_separator} ${date_now}"
 fi
 if [ "$show_session" -eq 1 ] && [ -n "$session_display" ]; then
-	preview="${preview} | ${session_display}"
+	preview="${preview} ${tail_separator} ${session_display}"
 fi
 if [ "$show_user" -eq 1 ] && [ -n "$omt_username" ]; then
-	preview="${preview} | ${omt_username}${omt_root}"
+	preview="${preview} ${tail_separator} ${omt_username}${omt_root}"
 fi
 if [ "$show_host" -eq 1 ] && [ -n "$host_display" ]; then
-	preview="${preview} | ${host_display}"
+	preview="${preview} ${tail_separator} ${host_display}"
 fi
 
 printf 'width=%s\n' "$width"

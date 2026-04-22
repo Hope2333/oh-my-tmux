@@ -77,9 +77,11 @@ omtmux doctor --width 72
 omtmux doctor --all-widths
 omtmux doctor --json
 omtmux verify
+omtmux verify --json
+omtmux verify --matrix
 ```
 
-Available display modes: `square` (default), `rounded`, `diamond`.
+Available display modes: `square` (default), `rounded`, `diamond`. They now drive both battery bar symbols and compact-tail separators.
 Available display presets: `auto` (default), `full`, `compact`, `micro`.
 
 `omtmux theme set` now refuses to switch branches when the repo worktree is dirty unless you pass `--force`.
@@ -89,6 +91,7 @@ Available display presets: `auto` (default), `full`, `compact`, `micro`.
 `omtmux doctor --all-widths` prints the preview matrix for `56 / 64 / 72 / 80 / 96 / 120`.
 `omtmux doctor --json` emits the same runtime snapshot as structured JSON.
 `omtmux verify` runs the current hotpath and width-tier assertions against the live theme.
+`omtmux verify --json` emits the same checks as JSON, and `omtmux verify --matrix` checks every theme branch for default mouse, tail expansion, separator support, and light-theme toolbar colors.
 
 Preview a future width tier before wiring it into hooks:
 
