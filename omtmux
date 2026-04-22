@@ -53,11 +53,39 @@ branch_upstream() {
 
 branch_sync_status() {
 	local branch="$1"
-	local upstream ahead behind counts
+	local local_hash remote_hash upstream ahead behind counts
+
+	local_hash="$(git -C "$repo_root" rev-parse "$branch" 2>/dev/null || true)"
+	[ -n "$local_hash" ] || {
+		printf 'missing'
+		return 0
+	}
+
+	remote_hash="$(git -C "$repo_root" ls-remote --heads --refs origin "$branch" 2>/dev/null | awk '{print $1}' | sed -n '1p')"
+	if [ -z "$remote_hash" ]; then
+		upstream="$(branch_upstream "$branch")"
+		if [ -n "$upstream" ]; then
+			remote_hash="$(git -C "$repo_root" rev-parse "$upstream" 2>/dev/null || true)"
+		fi
+	fi
+	[ -n "$remote_hash" ] || {
+		printf 'no-remote'
+		return 0
+	}
+
+	if [ "$local_hash" = "$remote_hash" ]; then
+		printf 'sync'
+		return 0
+	fi
 
 	upstream="$(branch_upstream "$branch")"
 	if [ -z "$upstream" ]; then
-		printf 'no-upstream'
+		printf 'differs'
+		return 0
+	fi
+
+	if [ "$(git -C "$repo_root" rev-parse "$upstream" 2>/dev/null || true)" != "$remote_hash" ]; then
+		printf 'differs'
 		return 0
 	fi
 
@@ -67,9 +95,7 @@ branch_sync_status() {
 	[ -n "$ahead" ] || ahead=0
 	[ -n "$behind" ] || behind=0
 
-	if [ "$ahead" -eq 0 ] && [ "$behind" -eq 0 ]; then
-		printf 'sync'
-	elif [ "$ahead" -gt 0 ] && [ "$behind" -eq 0 ]; then
+	if [ "$ahead" -gt 0 ] && [ "$behind" -eq 0 ]; then
 		printf 'ahead %s' "$ahead"
 	elif [ "$ahead" -eq 0 ] && [ "$behind" -gt 0 ]; then
 		printf 'behind %s' "$behind"
@@ -231,6 +257,15 @@ display_mode_symbols() {
 	esac
 }
 
+display_mode_separator() {
+	case "$1" in
+	square) printf '|' ;;
+	rounded) printf '•' ;;
+	diamond) printf '◆' ;;
+	*) return 1 ;;
+	esac
+}
+
 display_mode_current() {
 	local full empty
 	full="$("$tmux_bin" "${socket_args[@]}" show-option -gv @omt_battery_bar_symbol_full 2>/dev/null || true)"
@@ -271,7 +306,7 @@ theme_names() {
 theme_set() {
 	local force="${1:-}"
 	local branch="${2:-}"
-	local saved_mode saved_full saved_empty saved_preset saved_preset_default
+	local saved_mode saved_full saved_empty saved_separator saved_preset saved_preset_default
 	if [ "$force" != "--force" ]; then
 		branch="$force"
 		force=""
@@ -283,6 +318,7 @@ theme_set() {
 	saved_mode="$(value_get @omt_display_mode)"
 	saved_full="$(value_get @omt_battery_bar_symbol_full)"
 	saved_empty="$(value_get @omt_battery_bar_symbol_empty)"
+	saved_separator="$(value_get @omt_tail_separator)"
 	saved_preset="$(value_get @omt_display_preset)"
 	saved_preset_default="$(display_preset_default)"
 	git -C "$repo_root" checkout "$branch" >/dev/null
@@ -297,6 +333,9 @@ theme_set() {
 	if [ -n "$saved_empty" ]; then
 		set_config_value "@omt_battery_bar_symbol_empty" "$saved_empty"
 	fi
+	if [ -n "$saved_separator" ]; then
+		set_config_value "@omt_tail_separator" "$saved_separator"
+	fi
 	if [ -n "$saved_preset_default" ]; then
 		set_config_value "@omt_display_preset_default" "$saved_preset_default"
 	fi
@@ -309,12 +348,14 @@ theme_set() {
 	[ -n "$saved_mode" ] && tmux_set @omt_display_mode "$saved_mode"
 	[ -n "$saved_full" ] && tmux_set @omt_battery_bar_symbol_full "$saved_full"
 	[ -n "$saved_empty" ] && tmux_set @omt_battery_bar_symbol_empty "$saved_empty"
+	[ -n "$saved_separator" ] && tmux_set @omt_tail_separator "$saved_separator"
 	[ -n "$saved_preset_default" ] && tmux_set @omt_display_preset_default "$saved_preset_default"
 	if [ -n "$saved_preset" ]; then
 		tmux_set @omt_display_preset "$saved_preset"
 	else
 		tmux_set @omt_display_preset "$saved_preset_default"
 	fi
+	"$tmux_bin" "${socket_args[@]}" set-option -g mouse on >/dev/null 2>&1 || true
 	reload_tmux
 	if [ -x "$tmux_perf_dir/refresh-battery-bar.sh" ]; then
 		"$tmux_perf_dir/refresh-battery-bar.sh" >/dev/null 2>&1 || true
@@ -327,19 +368,25 @@ theme_set() {
 
 display_mode_set() {
 	local mode="$1"
-	local full empty
+	local full empty separator
 	mapfile -t symbols < <(display_mode_symbols "$mode") || die "unknown display mode: $mode"
 	full="${symbols[0]}"
 	empty="${symbols[1]}"
+	separator="$(display_mode_separator "$mode")"
 	set_config_value "@omt_display_mode" "$mode"
 	set_config_value "@omt_battery_bar_symbol_full" "$full"
 	set_config_value "@omt_battery_bar_symbol_empty" "$empty"
+	set_config_value "@omt_tail_separator" "$separator"
 	sync_runtime_scripts
 	tmux_set @omt_display_mode "$mode"
 	tmux_set @omt_battery_bar_symbol_full "$full"
 	tmux_set @omt_battery_bar_symbol_empty "$empty"
+	tmux_set @omt_tail_separator "$separator"
 	if [ -x "$tmux_perf_dir/refresh-battery-bar.sh" ]; then
 		"$tmux_perf_dir/refresh-battery-bar.sh" >/dev/null 2>&1 || true
+	fi
+	if [ -x "$tmux_perf_dir/refresh-status-tail.sh" ]; then
+		"$tmux_perf_dir/refresh-status-tail.sh" >/dev/null 2>&1 || true
 	fi
 	reload_tmux
 	printf 'display_mode=%s\n' "$mode"
@@ -396,7 +443,7 @@ Usage:
   omtmux display preset reset-default
   omtmux display preview --width <n>
   omtmux doctor [--width <n>] [--preset <name>] [--all-widths] [--json]
-  omtmux verify
+  omtmux verify [--json] [--matrix]
 EOF
 }
 
@@ -410,21 +457,38 @@ render_value_get() {
 	printf '%s\n' "$output" | awk -F= -v key="$key" '$1 == key { print $2; exit }'
 }
 
+json_escape() {
+	local value="${1:-}"
+	value=${value//\\/\\\\}
+	value=${value//\"/\\\"}
+	value=${value//$'\n'/\\n}
+	value=${value//$'\r'/\\r}
+	value=${value//$'\t'/\\t}
+	printf '%s' "$value"
+}
+
 verify_expect() {
 	local label="$1"
 	local actual="$2"
 	local expected="$3"
 	if [ "$actual" != "$expected" ]; then
-		printf 'FAIL %s expected=%s actual=%s\n' "$label" "$expected" "$actual" >&2
+		if [ "${VERIFY_SILENT:-0}" != "1" ]; then
+			printf 'FAIL %s expected=%s actual=%s\n' "$label" "$expected" "$actual" >&2
+		fi
 		return 1
 	fi
-	printf 'PASS %s=%s\n' "$label" "$actual"
+	if [ "${VERIFY_SILENT:-0}" != "1" ]; then
+		printf 'PASS %s=%s\n' "$label" "$actual"
+	fi
 }
 
-verify_command() {
+verify_current_command() {
+	local json="${1:-0}"
 	local failures=0
 	local doctor_output hotpath mouse mode56 mode72 mode80 mode96 mode120
 	local host56 host72 host80 bar80 bar96 date120 user96 status_right
+
+	VERIFY_SILENT="$json"
 
 	doctor_output="$(bash "$tmux_perf_dir/doctor.sh" 2>/dev/null || true)"
 	hotpath="$(printf '%s\n' "$doctor_output" | awk -F= '$1=="hotpath"{print $2; exit}')"
@@ -436,11 +500,15 @@ verify_command() {
 
 	case "$status_right" in
 	*"cut -c3-"*|*"sh -s _battery_status"*|*"battery-bar-worker"*)
-		printf 'FAIL status-right contains legacy hotpath\n' >&2
+		if [ "$json" -eq 0 ]; then
+			printf 'FAIL status-right contains legacy hotpath\n' >&2
+		fi
 		failures=$((failures + 1))
 		;;
 	*)
-		printf 'PASS status-right=clean\n'
+		if [ "$json" -eq 0 ]; then
+			printf 'PASS status-right=clean\n'
+		fi
 		;;
 	esac
 
@@ -470,11 +538,155 @@ verify_command() {
 	verify_expect "width96.show_user" "${user96:-<none>}" "1" || failures=$((failures + 1))
 	verify_expect "width120.show_date" "${date120:-<none>}" "1" || failures=$((failures + 1))
 
+	if [ "$json" -eq 1 ]; then
+		printf '{\n'
+		printf '  "scope":"current",\n'
+		printf '  "ok": %s,\n' "$([ "$failures" -eq 0 ] && printf true || printf false)"
+		printf '  "failures": %s,\n' "$failures"
+		printf '  "checks": [\n'
+		printf '    {"name":"hotpath","actual":"%s","expected":"clean","ok":%s},\n' "$(json_escape "${hotpath:-<none>}")" "$([ "${hotpath:-<none>}" = clean ] && printf true || printf false)"
+		printf '    {"name":"mouse","actual":"%s","expected":"on","ok":%s},\n' "$(json_escape "${mouse:-<none>}")" "$([ "${mouse:-<none>}" = on ] && printf true || printf false)"
+		printf '    {"name":"width56.mode","actual":"%s","expected":"micro","ok":%s},\n' "$(json_escape "${mode56:-<none>}")" "$([ "${mode56:-<none>}" = micro ] && printf true || printf false)"
+		printf '    {"name":"width72.mode","actual":"%s","expected":"compact","ok":%s},\n' "$(json_escape "${mode72:-<none>}")" "$([ "${mode72:-<none>}" = compact ] && printf true || printf false)"
+		printf '    {"name":"width80.mode","actual":"%s","expected":"full","ok":%s},\n' "$(json_escape "${mode80:-<none>}")" "$([ "${mode80:-<none>}" = full ] && printf true || printf false)"
+		printf '    {"name":"width96.mode","actual":"%s","expected":"full","ok":%s},\n' "$(json_escape "${mode96:-<none>}")" "$([ "${mode96:-<none>}" = full ] && printf true || printf false)"
+		printf '    {"name":"width120.mode","actual":"%s","expected":"full","ok":%s},\n' "$(json_escape "${mode120:-<none>}")" "$([ "${mode120:-<none>}" = full ] && printf true || printf false)"
+		printf '    {"name":"width56.show_host","actual":"%s","expected":"0","ok":%s},\n' "$(json_escape "${host56:-<none>}")" "$([ "${host56:-<none>}" = 0 ] && printf true || printf false)"
+		printf '    {"name":"width72.show_host","actual":"%s","expected":"1","ok":%s},\n' "$(json_escape "${host72:-<none>}")" "$([ "${host72:-<none>}" = 1 ] && printf true || printf false)"
+		printf '    {"name":"width80.show_host","actual":"%s","expected":"1","ok":%s},\n' "$(json_escape "${host80:-<none>}")" "$([ "${host80:-<none>}" = 1 ] && printf true || printf false)"
+		printf '    {"name":"width80.show_battery_bar","actual":"%s","expected":"0","ok":%s},\n' "$(json_escape "${bar80:-<none>}")" "$([ "${bar80:-<none>}" = 0 ] && printf true || printf false)"
+		printf '    {"name":"width96.show_battery_bar","actual":"%s","expected":"1","ok":%s},\n' "$(json_escape "${bar96:-<none>}")" "$([ "${bar96:-<none>}" = 1 ] && printf true || printf false)"
+		printf '    {"name":"width96.show_user","actual":"%s","expected":"1","ok":%s},\n' "$(json_escape "${user96:-<none>}")" "$([ "${user96:-<none>}" = 1 ] && printf true || printf false)"
+		printf '    {"name":"width120.show_date","actual":"%s","expected":"1","ok":%s}\n' "$(json_escape "${date120:-<none>}")" "$([ "${date120:-<none>}" = 1 ] && printf true || printf false)"
+		printf '  ]\n}\n'
+		[ "$failures" -eq 0 ]
+		return $?
+	fi
+
+	unset VERIFY_SILENT
 	if [ "$failures" -ne 0 ]; then
 		printf 'verify=failed count=%s\n' "$failures" >&2
 		return 1
 	fi
 	printf 'verify=ok\n'
+}
+
+branch_file_value() {
+	local branch="$1"
+	local key="$2"
+	git -C "$repo_root" show "$branch:.tmux.conf.local" 2>/dev/null |
+	awk -v key="$key" '
+		$1 == "set" && $2 == "-g" && $3 == key {
+			sub(/^[^[:space:]]+[[:space:]]+[^[:space:]]+[[:space:]]+[^[:space:]]+[[:space:]]+/, "", $0)
+			gsub(/^"/, "", $0)
+			gsub(/"$/, "", $0)
+			print $0
+			exit
+		}
+	'
+}
+
+branch_contains() {
+	local branch="$1"
+	local pattern="$2"
+	local content
+	content="$(git -C "$repo_root" show "$branch:.tmux.conf.local" 2>/dev/null || true)"
+	printf '%s\n' "$content" | rg -q "$pattern"
+}
+
+branch_theme_color() {
+	local branch="$1"
+	local key="$2"
+	git -C "$repo_root" show "$branch:.tmux.conf.local" 2>/dev/null |
+	awk -v key="$key" '
+		index($0, key "=") == 1 {
+			if (match($0, /"#[^"]+"/)) {
+				value = substr($0, RSTART + 1, RLENGTH - 2)
+				print value
+				exit
+			}
+		}
+	'
+}
+
+verify_matrix_command() {
+	local json="${1:-0}"
+	local failures=0
+	local branch color6 color7 tail_prefix
+	local mouse_on uses_expand uses_separator
+	local results=""
+
+	for branch in lite arc-dark arc-light arc-glass-dark arc-glass-light; do
+		mouse_on=false
+		uses_expand=false
+		uses_separator=false
+
+		branch_contains "$branch" 'set -g mouse on' && mouse_on=true
+		branch_contains "$branch" '#\{E:@omt_status_tail\}' && uses_expand=true
+		branch_contains "$branch" '@omt_tail_separator' && uses_separator=true
+		color6="$(branch_theme_color "$branch" "tmux_conf_theme_colour_6")"
+		color7="$(branch_theme_color "$branch" "tmux_conf_theme_colour_7")"
+		tail_prefix="$(branch_file_value "$branch" "@omt_status_tail_compact_prefix")"
+
+		if [ "$json" -eq 0 ]; then
+			printf '[%s]\n' "$branch"
+			printf '  mouse=%s\n' "$mouse_on"
+			printf '  tail_expand=%s\n' "$uses_expand"
+			printf '  tail_separator=%s\n' "$uses_separator"
+			printf '  colour_6=%s\n' "${color6:-<none>}"
+			printf '  colour_7=%s\n' "${color7:-<none>}"
+		fi
+
+		[ "$mouse_on" = true ] || failures=$((failures + 1))
+		[ "$uses_expand" = true ] || failures=$((failures + 1))
+		[ "$uses_separator" = true ] || failures=$((failures + 1))
+
+		if [ "$branch" = arc-light ] || [ "$branch" = arc-glass-light ]; then
+			[ "$color6" = "#fbfbfc" ] || failures=$((failures + 1))
+			[ "$color7" = "#5c616c" ] || failures=$((failures + 1))
+			printf '%s\n' "$tail_prefix" | rg -q 'bg=#fbfbfc' || failures=$((failures + 1))
+		fi
+
+		if [ "$json" -eq 1 ]; then
+			results="${results}${results:+,}
+    {\"branch\":\"$branch\",\"mouse\":$mouse_on,\"tail_expand\":$uses_expand,\"tail_separator\":$uses_separator,\"colour_6\":\"$(json_escape "${color6:-}")\",\"colour_7\":\"$(json_escape "${color7:-}")\"}"
+		fi
+	done
+
+	if [ "$json" -eq 1 ]; then
+		printf '{\n  "scope":"matrix",\n  "ok": %s,\n  "failures": %s,\n  "branches": [\n%s\n  ]\n}\n' \
+			"$([ "$failures" -eq 0 ] && printf true || printf false)" \
+			"$failures" \
+			"$results"
+		[ "$failures" -eq 0 ]
+		return $?
+	fi
+
+	if [ "$failures" -ne 0 ]; then
+		printf 'verify-matrix=failed count=%s\n' "$failures" >&2
+		return 1
+	fi
+	printf 'verify-matrix=ok\n'
+}
+
+verify_command() {
+	local json=0
+	local matrix=0
+
+	while [ $# -gt 0 ]; do
+		case "$1" in
+		--json) json=1 ;;
+		--matrix) matrix=1 ;;
+		*) die "unknown verify option: $1" ;;
+		esac
+		shift
+	done
+
+	if [ "$matrix" -eq 1 ]; then
+		verify_matrix_command "$json"
+	else
+		verify_current_command "$json"
+	fi
 }
 
 cmd="${1:-}"
@@ -542,7 +754,8 @@ doctor)
 	exec bash "$tmux_perf_dir/doctor.sh" "$@"
 	;;
 verify)
-	verify_command
+	shift
+	verify_command "$@"
 	;;
 ""|-h|--help)
 	usage
