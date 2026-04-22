@@ -410,10 +410,12 @@ set -g mouse on
 set -g status-style "fg=#5c616c,bg=#f5f6f7"
 set -g window-status-style "fg=#5c616c,bg=#f5f6f7"
 set -g window-status-current-style "fg=#080808,bg=#00afff,bold"
+set -g window-active-style "fg=#383c4a,bg=#fbfbfc"
+set -g window-style "fg=#383c4a,bg=#fbfbfc"
 set -g message-style "fg=#080808,bg=#d7af00,bold"
 set -g message-command-style "fg=#080808,bg=#00afff,bold"
-set -g pane-border-style "fg=#d9dde0"
-set -g pane-active-border-style "fg=#00afff"
+set -g pane-border-style "fg=#d9dde0,bg=#fbfbfc"
+set -g pane-active-border-style "fg=#00afff,bg=#fbfbfc"
 
 unbind r
 bind r run-shell -b "$HOME/.config/tmux/omt-perf/reload.sh"
