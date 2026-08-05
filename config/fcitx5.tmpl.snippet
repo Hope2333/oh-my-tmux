@@ -1,0 +1,25 @@
+#   # -- fcitx5 IME indicator (kmscon) ---------------------------------------
+#   if [ "${tmux_conf_theme_fcitx5_mode-}" != "none" ]; then
+#     _fcitx5_enabled=false
+#     case "${tmux_conf_theme_fcitx5_mode-auto}" in
+#       force) _fcitx5_enabled=true ;;
+#       kmscon-only|auto)
+#         case "$TERM" in
+#           *kmscon*) _fcitx5_enabled=true ;;
+#         esac ;;
+#     esac
+#     if [ "$_fcitx5_enabled" = "true" ]; then
+#       _fcitx5_indicator="#{@fcitx5}"
+#       case "${tmux_conf_theme_fcitx5_position-left}" in
+#         right) status_right="${status_right}${_fcitx5_indicator}" ;;
+#         center)
+#           _fcitx5_anchor="#{?@"
+#           case "$status_right" in
+#             *"$_fcitx5_anchor"*) status_right="${status_right%%$_fcitx5_anchor*}${_fcitx5_indicator} ${status_right#*$_fcitx5_anchor}" ;;
+#             *) status_right="${_fcitx5_indicator}${status_right}" ;;
+#           esac ;;
+#         *) status_right="${_fcitx5_indicator}${status_right}" ;;
+#       esac
+#       "$TMUX_PROGRAM" run-shell /usr/share/tmux-fcitx5/fcitx5.tmux
+#     fi
+#   fi
