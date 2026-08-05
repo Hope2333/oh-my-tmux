@@ -1,0 +1,168 @@
+#!/bin/bash
+# omtconfig - Oh My Tmux configuration manager
+# https://github.com/Hope2333/oh-my-tmux
+# (‑●‑●)> dual licensed under the WTFPL v2 license and the MIT license.
+#
+# Manages shared configuration snippets across all theme branches.
+# The canonical snippets live in the config/ directory of the main branch:
+#   config/fcitx5.tmpl.snippet   - template section (injected into .tmux.conf)
+#   config/fcitx5.local.snippet  - local block (injected into .tmux.conf.local)
+#
+# Usage:
+#   omtconfig list                          list injection status per branch
+#   omtconfig sync [--all] [--commit]       inject missing snippets
+#   omtconfig doctor                        consistency check
+#   omtconfig prune-sync-branch             remove redundant arc-dark-sync
+#   omtconfig --help
+
+set -u
+
+repo_root="$(cd "$(dirname "$0")" && pwd)"
+main_branch="main"
+theme_branches=(arc-dark dark light arc-light arc-glass-dark arc-glass-light lite)
+sync_branch="arc-dark-sync"
+snippet_dir="$repo_root/config"
+tmpl_snippet="$snippet_dir/fcitx5.tmpl.snippet"
+local_snippet="$snippet_dir/fcitx5.local.snippet"
+
+tmpl_marker="#   # -- fcitx5 IME indicator (kmscon)"
+local_marker="# -- fcitx5 (kmscon IME) ---"
+tmpl_anchor="#   tmux set -g set-titles-string"
+local_anchor='# "$@"'
+
+die() { printf '\xe2\x9d\x8c %s\n' "$*" >&2; exit 1; }
+
+branch_exists() { git -C "$repo_root" rev-parse --verify --quiet "refs/heads/$1" >/dev/null; }
+
+# --- checks ---------------------------------------------------------------
+
+branch_has_tmpl() { git -C "$repo_root" show "$1:.tmux.conf" 2>/dev/null | grep -qF "$tmpl_marker"; }
+branch_has_local() { git -C "$repo_root" show "$1:.tmux.conf.local" 2>/dev/null | grep -qF "$local_marker"; }
+branch_has_config() { git -C "$repo_root" cat-file -e "$1:config/fcitx5.tmpl.snippet" 2>/dev/null; }
+
+# --- list -----------------------------------------------------------------
+
+cmd_list() {
+	printf '%-16s %-8s %-8s %-8s\n' BRANCH TMPL LOCAL CONFIG
+	for b in "$main_branch" "${theme_branches[@]}" "$sync_branch"; do
+		if ! branch_exists "$b"; then continue; fi
+		t=$(branch_has_tmpl "$b" && echo yes || echo no)
+		l=$(branch_has_local "$b" && echo yes || echo no)
+		c=$(branch_has_config "$b" && echo yes || echo no)
+		printf '%-16s %-8s %-8s %-8s\n' "$b" "$t" "$l" "$c"
+	done
+}
+
+
+# --- sync -----------------------------------------------------------------
+
+cmd_sync() {
+	local do_commit=false do_all=false
+	for arg in "$@"; do
+		case "$arg" in
+		--commit) do_commit=true ;;
+		--all) do_all=true ;;
+		*) die "unknown option: $arg" ;;
+		esac
+	done
+
+	local tmpl_tmp local_tmp
+	tmpl_tmp="$(mktemp)"; local_tmp="$(mktemp)"
+	if ! git -C "$repo_root" show "$main_branch:config/fcitx5.tmpl.snippet" > "$tmpl_tmp" 2>/dev/null; then
+		rm -f "$tmpl_tmp" "$local_tmp"; die "main:$main_branch lacks config/fcitx5.tmpl.snippet"
+	fi
+	if ! git -C "$repo_root" show "$main_branch:config/fcitx5.local.snippet" > "$local_tmp" 2>/dev/null; then
+		rm -f "$tmpl_tmp" "$local_tmp"; die "main:$main_branch lacks config/fcitx5.local.snippet"
+	fi
+
+	local branches=()
+	if $do_all; then
+		branches=("${theme_branches[@]}")
+	else
+		branches=("$(git -C "$repo_root" branch --show-current)")
+	fi
+
+	for b in "${branches[@]}"; do
+		[ "$b" = "$main_branch" ] && continue
+		if ! branch_exists "$b"; then rm -f "$tmpl_tmp" "$local_tmp"; die "no local branch $b"; fi
+		git -C "$repo_root" checkout -q "$b"
+		local changed=false
+		if ! branch_has_tmpl "$b"; then
+			inject_before .tmux.conf "$tmpl_anchor" "$tmpl_tmp" > .tmux.conf.new && mv .tmux.conf.new .tmux.conf && changed=true
+		fi
+		if ! branch_has_local "$b"; then
+			inject_before .tmux.conf.local "$local_anchor" "$local_tmp" > .tmux.conf.local.new && mv .tmux.conf.local.new .tmux.conf.local && changed=true
+		fi
+		if $changed; then
+			git add .tmux.conf .tmux.conf.local
+			if $do_commit; then
+				git commit -q -m "chore: sync fcitx5 config via omtconfig"
+			else
+				printf '\xe2\x9a\xa0\xef\xb8\x8f  %s: injected, staged (commit with --commit)\n' "$b"
+			fi
+		else
+			printf '\xe2\x9c\x93 %s: up to date\n' "$b"
+		fi
+	done
+	rm -f "$tmpl_tmp" "$local_tmp"
+	git -C "$repo_root" checkout -q "$main_branch"
+}
+# --- doctor ---------------------------------------------------------------
+
+cmd_doctor() {
+	local rc=0
+	for b in "$main_branch" "${theme_branches[@]}"; do
+		if ! branch_exists "$b"; then continue; fi
+		if [ "$b" = "$main_branch" ]; then
+			if branch_has_config "$b"; then
+				printf '\xe2\x9c\x93 %s: config/ snippets present\n' "$b"
+			else
+				printf '\xe2\x9c\x97 %s: config/ snippets missing\n' "$b"
+				rc=1
+			fi
+			continue
+		fi
+		if branch_has_tmpl "$b" && branch_has_local "$b"; then
+			printf '\xe2\x9c\x93 %s: fcitx5 injected\n' "$b"
+		else
+			printf '\xe2\x9c\x97 %s: fcitx5 missing (tmpl=%s local=%s)\n' "$b" \
+				"$(branch_has_tmpl "$b" && echo yes || echo no)" \
+				"$(branch_has_local "$b" && echo yes || echo no)"
+			rc=1
+		fi
+	done
+	if branch_exists "$sync_branch"; then
+		if git -C "$repo_root" diff --quiet "$sync_branch" arc-dark 2>/dev/null; then
+			printf '\xe2\x9a\xa0\xef\xb8\x8f  %s is identical to arc-dark - run omtconfig prune-sync-branch\n' "$sync_branch"
+		fi
+	fi
+	return $rc
+}
+# --- prune ----------------------------------------------------------------
+
+cmd_prune() {
+	branch_exists "$sync_branch" || die "no branch $sync_branch"
+	git -C "$repo_root" diff --quiet "$sync_branch" arc-dark || die "$sync_branch differs from arc-dark - not pruning"
+	git -C "$repo_root" branch -D "$sync_branch"
+	git -C "$repo_root" push origin --delete "$sync_branch" 2>/dev/null || \
+		printf '\xe2\x9a\xa0\xef\xb8\x8f  remote delete failed (may need manual push)\n'
+	printf '\xe2\x9c\x93 pruned %s (local + remote)\n' "$sync_branch"
+}
+
+# --- main -----------------------------------------------------------------
+
+case "${1:-}" in
+list) cmd_list ;;
+sync) shift; cmd_sync "$@" ;;
+doctor) cmd_doctor ;;
+prune-sync-branch) cmd_prune ;;
+""|-h|--help)
+	printf '%s\n' \
+		'Usage:' \
+		'  omtconfig list                    list injection status per branch' \
+		'  omtconfig sync [--all] [--commit] inject missing fcitx5 snippets' \
+		'  omtconfig doctor                  consistency check' \
+		'  omtconfig prune-sync-branch       remove redundant arc-dark-sync branch'
+	;;
+*) die "unknown command: $1" ;;
+esac
