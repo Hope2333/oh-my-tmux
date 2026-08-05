@@ -53,21 +53,8 @@ cmd_list() {
 	done
 }
 
-# --- sync -----------------------------------------------------------------
 
-inject_before() { # file anchor snippet_file -> prints new content to stdout
-	awk -v anchor="$2" -v ins="$3" '
-		{ lines[NR] = $0 }
-		END {
-			for (i = 1; i <= NR; i++) {
-				if (lines[i] == anchor) {
-					while ((getline line < ins) > 0) print line
-					close(ins)
-				}
-				print lines[i]
-			}
-		}' "$1"
-}
+# --- sync -----------------------------------------------------------------
 
 cmd_sync() {
 	local do_commit=false do_all=false
@@ -79,8 +66,14 @@ cmd_sync() {
 		esac
 	done
 
-	[ -f "$tmpl_snippet" ] || die "missing $tmpl_snippet (run from a checkout of $main_branch)"
-	[ -f "$local_snippet" ] || die "missing $local_snippet"
+	local tmpl_tmp local_tmp
+	tmpl_tmp="$(mktemp)"; local_tmp="$(mktemp)"
+	if ! git -C "$repo_root" show "$main_branch:config/fcitx5.tmpl.snippet" > "$tmpl_tmp" 2>/dev/null; then
+		rm -f "$tmpl_tmp" "$local_tmp"; die "main:$main_branch lacks config/fcitx5.tmpl.snippet"
+	fi
+	if ! git -C "$repo_root" show "$main_branch:config/fcitx5.local.snippet" > "$local_tmp" 2>/dev/null; then
+		rm -f "$tmpl_tmp" "$local_tmp"; die "main:$main_branch lacks config/fcitx5.local.snippet"
+	fi
 
 	local branches=()
 	if $do_all; then
@@ -91,14 +84,14 @@ cmd_sync() {
 
 	for b in "${branches[@]}"; do
 		[ "$b" = "$main_branch" ] && continue
-		branch_exists "$b" || die "no local branch $b"
+		if ! branch_exists "$b"; then rm -f "$tmpl_tmp" "$local_tmp"; die "no local branch $b"; fi
 		git -C "$repo_root" checkout -q "$b"
 		local changed=false
 		if ! branch_has_tmpl "$b"; then
-			inject_before .tmux.conf "$tmpl_anchor" "$tmpl_snippet" > .tmux.conf.new && mv .tmux.conf.new .tmux.conf && changed=true
+			inject_before .tmux.conf "$tmpl_anchor" "$tmpl_tmp" > .tmux.conf.new && mv .tmux.conf.new .tmux.conf && changed=true
 		fi
 		if ! branch_has_local "$b"; then
-			inject_before .tmux.conf.local "$local_anchor" "$local_snippet" > .tmux.conf.local.new && mv .tmux.conf.local.new .tmux.conf.local && changed=true
+			inject_before .tmux.conf.local "$local_anchor" "$local_tmp" > .tmux.conf.local.new && mv .tmux.conf.local.new .tmux.conf.local && changed=true
 		fi
 		if $changed; then
 			git add .tmux.conf .tmux.conf.local
@@ -111,10 +104,9 @@ cmd_sync() {
 			printf '\xe2\x9c\x93 %s: up to date\n' "$b"
 		fi
 	done
+	rm -f "$tmpl_tmp" "$local_tmp"
 	git -C "$repo_root" checkout -q "$main_branch"
 }
-
-
 # --- doctor ---------------------------------------------------------------
 
 cmd_doctor() {
