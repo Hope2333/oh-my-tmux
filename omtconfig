@@ -114,12 +114,22 @@ cmd_sync() {
 	git -C "$repo_root" checkout -q "$main_branch"
 }
 
+
 # --- doctor ---------------------------------------------------------------
 
 cmd_doctor() {
 	local rc=0
 	for b in "$main_branch" "${theme_branches[@]}"; do
 		if ! branch_exists "$b"; then continue; fi
+		if [ "$b" = "$main_branch" ]; then
+			if branch_has_config "$b"; then
+				printf '\xe2\x9c\x93 %s: config/ snippets present\n' "$b"
+			else
+				printf '\xe2\x9c\x97 %s: config/ snippets missing\n' "$b"
+				rc=1
+			fi
+			continue
+		fi
 		if branch_has_tmpl "$b" && branch_has_local "$b"; then
 			printf '\xe2\x9c\x93 %s: fcitx5 injected\n' "$b"
 		else
@@ -136,7 +146,6 @@ cmd_doctor() {
 	fi
 	return $rc
 }
-
 # --- prune ----------------------------------------------------------------
 
 cmd_prune() {
