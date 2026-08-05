@@ -1,0 +1,794 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+script_path="${BASH_SOURCE[0]}"
+if command -v readlink >/dev/null 2>&1; then
+	resolved="$(readlink -f -- "$script_path" 2>/dev/null || true)"
+	if [ -n "$resolved" ]; then
+		script_path="$resolved"
+	fi
+fi
+repo_root="$(cd -- "$(dirname -- "$script_path")" && pwd)"
+repo_perf_dir="$repo_root/omt-perf"
+tmux_config_home="${XDG_CONFIG_HOME:-$HOME/.config}/tmux"
+tmux_conf="$tmux_config_home/tmux.conf"
+tmux_conf_local="$tmux_config_home/tmux.conf.local"
+tmux_perf_dir="$tmux_config_home/omt-perf"
+tmux_bin="${TMUX_PROGRAM:-tmux}"
+socket_args=()
+
+if [ -n "${TMUX_SOCKET:-}" ]; then
+	socket_args=(-S "$TMUX_SOCKET")
+elif [ -n "${TMUX:-}" ]; then
+	socket_args=(-S "${TMUX%%,*}")
+fi
+
+die() {
+	printf '%s\n' "$*" >&2
+	exit 1
+}
+
+git_status_porcelain() {
+	git -C "$repo_root" status --short
+}
+
+git_is_dirty() {
+	[ -n "$(git_status_porcelain)" ]
+}
+
+branch_upstream() {
+	local branch="$1"
+	local upstream
+
+	upstream="$(git -C "$repo_root" rev-parse --abbrev-ref "$branch@{upstream}" 2>/dev/null || true)"
+	if [ -n "$upstream" ]; then
+		printf '%s\n' "$upstream"
+		return 0
+	fi
+
+	if git -C "$repo_root" show-ref --verify --quiet "refs/remotes/origin/$branch"; then
+		printf 'origin/%s\n' "$branch"
+	fi
+}
+
+branch_sync_status() {
+	local branch="$1"
+	local local_hash remote_hash upstream ahead behind counts
+
+	local_hash="$(git -C "$repo_root" rev-parse "$branch" 2>/dev/null || true)"
+	[ -n "$local_hash" ] || {
+		printf 'missing'
+		return 0
+	}
+
+	remote_hash="$(git -C "$repo_root" ls-remote --heads --refs origin "$branch" 2>/dev/null | awk '{print $1}' | sed -n '1p')"
+	if [ -z "$remote_hash" ]; then
+		upstream="$(branch_upstream "$branch")"
+		if [ -n "$upstream" ]; then
+			remote_hash="$(git -C "$repo_root" rev-parse "$upstream" 2>/dev/null || true)"
+		fi
+	fi
+	[ -n "$remote_hash" ] || {
+		printf 'no-remote'
+		return 0
+	}
+
+	if [ "$local_hash" = "$remote_hash" ]; then
+		printf 'sync'
+		return 0
+	fi
+
+	upstream="$(branch_upstream "$branch")"
+	if [ -z "$upstream" ]; then
+		printf 'differs'
+		return 0
+	fi
+
+	if [ "$(git -C "$repo_root" rev-parse "$upstream" 2>/dev/null || true)" != "$remote_hash" ]; then
+		printf 'differs'
+		return 0
+	fi
+
+	counts="$(git -C "$repo_root" rev-list --left-right --count "${branch}...${upstream}" 2>/dev/null || true)"
+	ahead="$(printf '%s\n' "$counts" | awk '{print $1}')"
+	behind="$(printf '%s\n' "$counts" | awk '{print $2}')"
+	[ -n "$ahead" ] || ahead=0
+	[ -n "$behind" ] || behind=0
+
+	if [ "$ahead" -gt 0 ] && [ "$behind" -eq 0 ]; then
+		printf 'ahead %s' "$ahead"
+	elif [ "$ahead" -eq 0 ] && [ "$behind" -gt 0 ]; then
+		printf 'behind %s' "$behind"
+	else
+		printf 'diverged +%s/-%s' "$ahead" "$behind"
+	fi
+}
+
+tmux_get() {
+	"$tmux_bin" "${socket_args[@]}" show-option -gv "$1" 2>/dev/null || true
+}
+
+tmux_set() {
+	"$tmux_bin" "${socket_args[@]}" set-option -g "$1" "$2"
+}
+
+config_get() {
+	local key="$1"
+	local file="$tmux_conf_local"
+
+	[ -f "$file" ] || return 0
+	awk -v key="$key" '
+		$1 == "set" && $2 == "-g" && $3 == key {
+			sub(/^[^[:space:]]+[[:space:]]+[^[:space:]]+[[:space:]]+[^[:space:]]+[[:space:]]+/, "", $0)
+			gsub(/^"/, "", $0)
+			gsub(/"$/, "", $0)
+			print $0
+			exit
+		}
+	' "$file" 2>/dev/null || true
+}
+
+value_get() {
+	local key="$1"
+	local value
+
+	value="$(tmux_get "$key")"
+	if [ -n "$value" ]; then
+		printf '%s\n' "$value"
+		return 0
+	fi
+
+	config_get "$key"
+}
+
+sync_branch_to_local() {
+	mkdir -p "$tmux_config_home"
+	ln -sfn "$repo_root/.tmux.conf" "$tmux_conf"
+	cp "$repo_root/.tmux.conf.local" "$tmux_conf_local"
+	rm -rf "$tmux_perf_dir"
+	cp -a "$repo_perf_dir" "$tmux_perf_dir"
+}
+
+sync_runtime_scripts() {
+	mkdir -p "$tmux_config_home"
+	ln -sfn "$repo_root/.tmux.conf" "$tmux_conf"
+	rm -rf "$tmux_perf_dir"
+	cp -a "$repo_perf_dir" "$tmux_perf_dir"
+}
+
+reload_tmux() {
+	if [ -f "$tmux_perf_dir/reload.sh" ]; then
+		"$tmux_perf_dir/reload.sh" >/dev/null 2>&1 || true
+	fi
+}
+
+current_branch() {
+	git -C "$repo_root" branch --show-current
+}
+
+runtime_theme_current() {
+	local theme
+	theme="$(tmux_get @omt_theme_branch)"
+	if [ -n "$theme" ]; then
+		printf '%s\n' "$theme"
+		return 0
+	fi
+
+	theme="$(config_get @omt_theme_branch)"
+	printf '%s\n' "$theme"
+}
+
+display_mode_list() {
+	local current
+	current="$(display_mode_current)"
+	for mode in square rounded diamond; do
+		if [ "$mode" = "$current" ]; then
+			printf '* %s\n' "$mode"
+		else
+			printf '  %s\n' "$mode"
+		fi
+	done
+}
+
+display_preset_current() {
+	local preset
+	preset="$(value_get @omt_display_preset)"
+	if [ -z "$preset" ]; then
+		preset="$(display_preset_default)"
+	fi
+	[ -n "$preset" ] || preset="auto"
+	printf '%s\n' "$preset"
+}
+
+display_preset_default() {
+	local preset
+	preset="$(value_get @omt_display_preset_default)"
+	[ -n "$preset" ] || preset="auto"
+	printf '%s\n' "$preset"
+}
+
+display_preset_list() {
+	local current default marker suffix
+	current="$(display_preset_current)"
+	default="$(display_preset_default)"
+	for preset in auto full compact micro; do
+		marker=" "
+		suffix=""
+		if [ "$preset" = "$current" ]; then
+			marker="*"
+		fi
+		if [ "$preset" = "$default" ]; then
+			suffix=" (default)"
+		fi
+		printf '%s %s%s\n' "$marker" "$preset" "$suffix"
+	done
+}
+
+set_config_value() {
+	local key="$1"
+	local value="$2"
+	local file="$tmux_conf_local"
+	local tmp
+
+	[ -f "$file" ] || die "missing $file"
+	tmp="$(mktemp)"
+	awk -v key="$key" -v value="$value" '
+		BEGIN { updated=0 }
+		$1 == "set" && $2 == "-g" && $3 == key {
+			print "set -g " key " \"" value "\""
+			updated=1
+			next
+		}
+		{ print }
+		END {
+			if (!updated)
+				print "set -g " key " \"" value "\""
+		}
+	' "$file" >"$tmp"
+	mv "$tmp" "$file"
+}
+
+display_mode_symbols() {
+	case "$1" in
+	square)  printf '◼\n◻\n' ;;
+	rounded) printf '●\n○\n' ;;
+	diamond) printf '◆\n◇\n' ;;
+	*) return 1 ;;
+	esac
+}
+
+display_mode_separator() {
+	case "$1" in
+	square) printf '|' ;;
+	rounded) printf '•' ;;
+	diamond) printf '◆' ;;
+	*) return 1 ;;
+	esac
+}
+
+display_mode_current() {
+	local full empty
+	full="$("$tmux_bin" "${socket_args[@]}" show-option -gv @omt_battery_bar_symbol_full 2>/dev/null || true)"
+	empty="$("$tmux_bin" "${socket_args[@]}" show-option -gv @omt_battery_bar_symbol_empty 2>/dev/null || true)"
+	case "$full:$empty" in
+	"◼:◻") printf 'square\n' ;;
+	"●:○") printf 'rounded\n' ;;
+	"◆:◇") printf 'diamond\n' ;;
+	*) printf 'custom\n' ;;
+	esac
+}
+
+theme_list() {
+	local current runtime marker sync_state details
+	current="$(current_branch)"
+	runtime="$(runtime_theme_current)"
+	for branch in dark light arc-dark arc-light arc-glass-dark arc-glass-light; do
+		marker=" "
+		if [ "$branch" = "$current" ]; then
+			marker="*"
+		fi
+		sync_state="$(branch_sync_status "$branch")"
+		details="$sync_state"
+		if [ "$branch" = "$runtime" ]; then
+			details="$details, live"
+		fi
+		printf '%s %s (%s)\n' "$marker" "$branch" "$details"
+	done
+	if git_is_dirty; then
+		printf '! worktree has local changes\n'
+	fi
+}
+
+theme_names() {
+	printf '%s\n' dark light arc-dark arc-light arc-glass-dark arc-glass-light
+}
+
+theme_set() {
+	local force="${1:-}"
+	local branch="${2:-}"
+	local saved_mode saved_full saved_empty saved_separator saved_preset saved_preset_default
+	if [ "$force" != "--force" ]; then
+		branch="$force"
+		force=""
+	fi
+	theme_names | rg -x "$branch" >/dev/null || die "unknown theme branch: $branch"
+	if git_is_dirty && [ "$force" != "--force" ]; then
+		die "refusing to switch theme with a dirty worktree; commit/stash first or use: omtmux theme set --force $branch"
+	fi
+	saved_mode="$(value_get @omt_display_mode)"
+	saved_full="$(value_get @omt_battery_bar_symbol_full)"
+	saved_empty="$(value_get @omt_battery_bar_symbol_empty)"
+	saved_separator="$(value_get @omt_tail_separator)"
+	saved_preset="$(value_get @omt_display_preset)"
+	saved_preset_default="$(display_preset_default)"
+	git -C "$repo_root" checkout "$branch" >/dev/null
+	sync_branch_to_local
+	set_config_value "@omt_theme_branch" "$branch"
+	if [ -n "$saved_mode" ]; then
+		set_config_value "@omt_display_mode" "$saved_mode"
+	fi
+	if [ -n "$saved_full" ]; then
+		set_config_value "@omt_battery_bar_symbol_full" "$saved_full"
+	fi
+	if [ -n "$saved_empty" ]; then
+		set_config_value "@omt_battery_bar_symbol_empty" "$saved_empty"
+	fi
+	if [ -n "$saved_separator" ]; then
+		set_config_value "@omt_tail_separator" "$saved_separator"
+	fi
+	if [ -n "$saved_preset_default" ]; then
+		set_config_value "@omt_display_preset_default" "$saved_preset_default"
+	fi
+	if [ -n "$saved_preset" ]; then
+		set_config_value "@omt_display_preset" "$saved_preset"
+	else
+		set_config_value "@omt_display_preset" "$saved_preset_default"
+	fi
+	"$tmux_bin" "${socket_args[@]}" set-option -g @omt_theme_branch "$branch" >/dev/null 2>&1 || true
+	[ -n "$saved_mode" ] && tmux_set @omt_display_mode "$saved_mode"
+	[ -n "$saved_full" ] && tmux_set @omt_battery_bar_symbol_full "$saved_full"
+	[ -n "$saved_empty" ] && tmux_set @omt_battery_bar_symbol_empty "$saved_empty"
+	[ -n "$saved_separator" ] && tmux_set @omt_tail_separator "$saved_separator"
+	[ -n "$saved_preset_default" ] && tmux_set @omt_display_preset_default "$saved_preset_default"
+	if [ -n "$saved_preset" ]; then
+		tmux_set @omt_display_preset "$saved_preset"
+	else
+		tmux_set @omt_display_preset "$saved_preset_default"
+	fi
+	"$tmux_bin" "${socket_args[@]}" set-option -g mouse on >/dev/null 2>&1 || true
+	reload_tmux
+	if [ -x "$tmux_perf_dir/refresh-battery-bar.sh" ]; then
+		"$tmux_perf_dir/refresh-battery-bar.sh" >/dev/null 2>&1 || true
+	fi
+	if [ -x "$tmux_perf_dir/refresh-status-tail.sh" ]; then
+		"$tmux_perf_dir/refresh-status-tail.sh" >/dev/null 2>&1 || true
+	fi
+	printf 'theme=%s\n' "$branch"
+}
+
+display_mode_set() {
+	local mode="$1"
+	local full empty separator
+	mapfile -t symbols < <(display_mode_symbols "$mode") || die "unknown display mode: $mode"
+	full="${symbols[0]}"
+	empty="${symbols[1]}"
+	separator="$(display_mode_separator "$mode")"
+	set_config_value "@omt_display_mode" "$mode"
+	set_config_value "@omt_battery_bar_symbol_full" "$full"
+	set_config_value "@omt_battery_bar_symbol_empty" "$empty"
+	set_config_value "@omt_tail_separator" "$separator"
+	sync_runtime_scripts
+	tmux_set @omt_display_mode "$mode"
+	tmux_set @omt_battery_bar_symbol_full "$full"
+	tmux_set @omt_battery_bar_symbol_empty "$empty"
+	tmux_set @omt_tail_separator "$separator"
+	if [ -x "$tmux_perf_dir/refresh-battery-bar.sh" ]; then
+		"$tmux_perf_dir/refresh-battery-bar.sh" >/dev/null 2>&1 || true
+	fi
+	if [ -x "$tmux_perf_dir/refresh-status-tail.sh" ]; then
+		"$tmux_perf_dir/refresh-status-tail.sh" >/dev/null 2>&1 || true
+	fi
+	reload_tmux
+	printf 'display_mode=%s\n' "$mode"
+}
+
+display_preset_set() {
+	local preset="$1"
+	case "$preset" in
+	auto | full | compact | micro) ;;
+	*) die "unknown display preset: $preset" ;;
+	esac
+	set_config_value "@omt_display_preset" "$preset"
+	sync_runtime_scripts
+	tmux_set @omt_display_preset "$preset"
+	if [ -x "$tmux_perf_dir/refresh-status-tail.sh" ]; then
+		"$tmux_perf_dir/refresh-status-tail.sh" --preset "$preset" >/dev/null 2>&1 || true
+	fi
+	reload_tmux
+	printf 'display_preset=%s\n' "$preset"
+}
+
+display_preset_save_default() {
+	local preset="${1:-}"
+	if [ -z "$preset" ]; then
+		preset="$(display_preset_current)"
+	fi
+	case "$preset" in
+	auto | full | compact | micro) ;;
+	*) die "unknown display preset: $preset" ;;
+	esac
+	set_config_value "@omt_display_preset_default" "$preset"
+	sync_runtime_scripts
+	tmux_set @omt_display_preset_default "$preset"
+	printf 'display_preset_default=%s\n' "$preset"
+}
+
+display_preset_reset_default() {
+	display_preset_save_default auto
+}
+
+usage() {
+	cat <<'EOF'
+Usage:
+  omtmux theme list
+  omtmux theme current
+  omtmux theme set [--force] <dark|light|arc-dark|arc-light|arc-glass-dark|arc-glass-light>
+  omtmux display mode list
+  omtmux display mode get
+  omtmux display mode set <square|rounded|diamond>
+  omtmux display preset list
+  omtmux display preset get
+  omtmux display preset set <auto|full|compact|micro>
+  omtmux display preset save-default [auto|full|compact|micro]
+  omtmux display preset reset-default
+  omtmux display preview --width <n>
+  omtmux doctor [--width <n>] [--preset <name>] [--all-widths] [--json]
+  omtmux verify [--json] [--matrix]
+EOF
+}
+
+render_value_get() {
+	local width="$1"
+	local key="$2"
+	local preset="${3:-auto}"
+	local output
+
+	output="$(bash "$tmux_perf_dir/render-status.sh" --width "$width" --preset "$preset" 2>/dev/null || true)"
+	printf '%s\n' "$output" | awk -F= -v key="$key" '$1 == key { print $2; exit }'
+}
+
+json_escape() {
+	local value="${1:-}"
+	value=${value//\\/\\\\}
+	value=${value//\"/\\\"}
+	value=${value//$'\n'/\\n}
+	value=${value//$'\r'/\\r}
+	value=${value//$'\t'/\\t}
+	printf '%s' "$value"
+}
+
+verify_expect() {
+	local label="$1"
+	local actual="$2"
+	local expected="$3"
+	if [ "$actual" != "$expected" ]; then
+		if [ "${VERIFY_SILENT:-0}" != "1" ]; then
+			printf 'FAIL %s expected=%s actual=%s\n' "$label" "$expected" "$actual" >&2
+		fi
+		return 1
+	fi
+	if [ "${VERIFY_SILENT:-0}" != "1" ]; then
+		printf 'PASS %s=%s\n' "$label" "$actual"
+	fi
+}
+
+verify_current_command() {
+	local json="${1:-0}"
+	local failures=0
+	local doctor_output hotpath mouse mode56 mode72 mode80 mode96 mode120
+	local host56 host72 host80 bar80 bar96 date120 user96 status_right
+
+	VERIFY_SILENT="$json"
+
+	doctor_output="$(bash "$tmux_perf_dir/doctor.sh" 2>/dev/null || true)"
+	hotpath="$(printf '%s\n' "$doctor_output" | awk -F= '$1=="hotpath"{print $2; exit}')"
+	mouse="$(printf '%s\n' "$doctor_output" | awk -F= '$1=="mouse"{print $2; exit}')"
+	status_right="$("$tmux_bin" "${socket_args[@]}" show-option -gv status-right 2>/dev/null || true)"
+
+	verify_expect "hotpath" "${hotpath:-<none>}" "clean" || failures=$((failures + 1))
+	verify_expect "mouse" "${mouse:-<none>}" "on" || failures=$((failures + 1))
+
+	case "$status_right" in
+	*"cut -c3-"*|*"sh -s _battery_status"*|*"battery-bar-worker"*)
+		if [ "$json" -eq 0 ]; then
+			printf 'FAIL status-right contains legacy hotpath\n' >&2
+		fi
+		failures=$((failures + 1))
+		;;
+	*)
+		if [ "$json" -eq 0 ]; then
+			printf 'PASS status-right=clean\n'
+		fi
+		;;
+	esac
+
+	mode56="$(render_value_get 56 mode auto)"
+	mode72="$(render_value_get 72 mode auto)"
+	mode80="$(render_value_get 80 mode auto)"
+	mode96="$(render_value_get 96 mode auto)"
+	mode120="$(render_value_get 120 mode auto)"
+	host56="$(render_value_get 56 show_host auto)"
+	host72="$(render_value_get 72 show_host auto)"
+	host80="$(render_value_get 80 show_host auto)"
+	bar80="$(render_value_get 80 show_battery_bar auto)"
+	bar96="$(render_value_get 96 show_battery_bar auto)"
+	user96="$(render_value_get 96 show_user auto)"
+	date120="$(render_value_get 120 show_date auto)"
+
+	verify_expect "width56.mode" "${mode56:-<none>}" "micro" || failures=$((failures + 1))
+	verify_expect "width72.mode" "${mode72:-<none>}" "compact" || failures=$((failures + 1))
+	verify_expect "width80.mode" "${mode80:-<none>}" "full" || failures=$((failures + 1))
+	verify_expect "width96.mode" "${mode96:-<none>}" "full" || failures=$((failures + 1))
+	verify_expect "width120.mode" "${mode120:-<none>}" "full" || failures=$((failures + 1))
+	verify_expect "width56.show_host" "${host56:-<none>}" "0" || failures=$((failures + 1))
+	verify_expect "width72.show_host" "${host72:-<none>}" "1" || failures=$((failures + 1))
+	verify_expect "width80.show_host" "${host80:-<none>}" "1" || failures=$((failures + 1))
+	verify_expect "width80.show_battery_bar" "${bar80:-<none>}" "0" || failures=$((failures + 1))
+	verify_expect "width96.show_battery_bar" "${bar96:-<none>}" "1" || failures=$((failures + 1))
+	verify_expect "width96.show_user" "${user96:-<none>}" "1" || failures=$((failures + 1))
+	verify_expect "width120.show_date" "${date120:-<none>}" "1" || failures=$((failures + 1))
+
+	if [ "$json" -eq 1 ]; then
+		printf '{\n'
+		printf '  "scope":"current",\n'
+		printf '  "ok": %s,\n' "$([ "$failures" -eq 0 ] && printf true || printf false)"
+		printf '  "failures": %s,\n' "$failures"
+		printf '  "checks": [\n'
+		printf '    {"name":"hotpath","actual":"%s","expected":"clean","ok":%s},\n' "$(json_escape "${hotpath:-<none>}")" "$([ "${hotpath:-<none>}" = clean ] && printf true || printf false)"
+		printf '    {"name":"mouse","actual":"%s","expected":"on","ok":%s},\n' "$(json_escape "${mouse:-<none>}")" "$([ "${mouse:-<none>}" = on ] && printf true || printf false)"
+		printf '    {"name":"width56.mode","actual":"%s","expected":"micro","ok":%s},\n' "$(json_escape "${mode56:-<none>}")" "$([ "${mode56:-<none>}" = micro ] && printf true || printf false)"
+		printf '    {"name":"width72.mode","actual":"%s","expected":"compact","ok":%s},\n' "$(json_escape "${mode72:-<none>}")" "$([ "${mode72:-<none>}" = compact ] && printf true || printf false)"
+		printf '    {"name":"width80.mode","actual":"%s","expected":"full","ok":%s},\n' "$(json_escape "${mode80:-<none>}")" "$([ "${mode80:-<none>}" = full ] && printf true || printf false)"
+		printf '    {"name":"width96.mode","actual":"%s","expected":"full","ok":%s},\n' "$(json_escape "${mode96:-<none>}")" "$([ "${mode96:-<none>}" = full ] && printf true || printf false)"
+		printf '    {"name":"width120.mode","actual":"%s","expected":"full","ok":%s},\n' "$(json_escape "${mode120:-<none>}")" "$([ "${mode120:-<none>}" = full ] && printf true || printf false)"
+		printf '    {"name":"width56.show_host","actual":"%s","expected":"0","ok":%s},\n' "$(json_escape "${host56:-<none>}")" "$([ "${host56:-<none>}" = 0 ] && printf true || printf false)"
+		printf '    {"name":"width72.show_host","actual":"%s","expected":"1","ok":%s},\n' "$(json_escape "${host72:-<none>}")" "$([ "${host72:-<none>}" = 1 ] && printf true || printf false)"
+		printf '    {"name":"width80.show_host","actual":"%s","expected":"1","ok":%s},\n' "$(json_escape "${host80:-<none>}")" "$([ "${host80:-<none>}" = 1 ] && printf true || printf false)"
+		printf '    {"name":"width80.show_battery_bar","actual":"%s","expected":"0","ok":%s},\n' "$(json_escape "${bar80:-<none>}")" "$([ "${bar80:-<none>}" = 0 ] && printf true || printf false)"
+		printf '    {"name":"width96.show_battery_bar","actual":"%s","expected":"1","ok":%s},\n' "$(json_escape "${bar96:-<none>}")" "$([ "${bar96:-<none>}" = 1 ] && printf true || printf false)"
+		printf '    {"name":"width96.show_user","actual":"%s","expected":"1","ok":%s},\n' "$(json_escape "${user96:-<none>}")" "$([ "${user96:-<none>}" = 1 ] && printf true || printf false)"
+		printf '    {"name":"width120.show_date","actual":"%s","expected":"1","ok":%s}\n' "$(json_escape "${date120:-<none>}")" "$([ "${date120:-<none>}" = 1 ] && printf true || printf false)"
+		printf '  ]\n}\n'
+		[ "$failures" -eq 0 ]
+		return $?
+	fi
+
+	unset VERIFY_SILENT
+	if [ "$failures" -ne 0 ]; then
+		printf 'verify=failed count=%s\n' "$failures" >&2
+		return 1
+	fi
+	printf 'verify=ok\n'
+}
+
+branch_file_value() {
+	local branch="$1"
+	local key="$2"
+	git -C "$repo_root" show "$branch:.tmux.conf.local" 2>/dev/null |
+	awk -v key="$key" '
+		$1 == "set" && $2 == "-g" && $3 == key {
+			sub(/^[^[:space:]]+[[:space:]]+[^[:space:]]+[[:space:]]+[^[:space:]]+[[:space:]]+/, "", $0)
+			gsub(/^"/, "", $0)
+			gsub(/"$/, "", $0)
+			print $0
+			exit
+		}
+	'
+}
+
+branch_contains() {
+	local branch="$1"
+	local pattern="$2"
+	local content
+	content="$(git -C "$repo_root" show "$branch:.tmux.conf.local" 2>/dev/null || true)"
+	printf '%s\n' "$content" | rg -q "$pattern"
+}
+
+branch_theme_color() {
+	local branch="$1"
+	local key="$2"
+	git -C "$repo_root" show "$branch:.tmux.conf.local" 2>/dev/null |
+	awk -v key="$key" '
+		index($0, key "=") == 1 {
+			if (match($0, /"#[^"]+"/)) {
+				value = substr($0, RSTART + 1, RLENGTH - 2)
+				print value
+				exit
+			}
+		}
+	'
+}
+
+branch_theme_value() {
+	local branch="$1"
+	local key="$2"
+	git -C "$repo_root" show "$branch:.tmux.conf.local" 2>/dev/null |
+	awk -v key="$key" '
+		index($0, key "=") == 1 {
+			sub(/^[^=]+=/, "", $0)
+			gsub(/^"/, "", $0)
+			gsub(/"$/, "", $0)
+			print $0
+			exit
+		}
+	'
+}
+
+verify_matrix_command() {
+	local json="${1:-0}"
+	local failures=0
+	local branch color6 color7 tail_prefix pane_bg pane_active_bg
+	local mouse_on uses_expand uses_separator
+	local results=""
+
+	for branch in dark light arc-dark arc-light arc-glass-dark arc-glass-light; do
+		mouse_on=false
+		uses_expand=false
+		uses_separator=false
+
+		branch_contains "$branch" 'set -g mouse on' && mouse_on=true
+		branch_contains "$branch" '#\{E:@omt_status_tail\}' && uses_expand=true
+		branch_contains "$branch" '@omt_tail_separator' && uses_separator=true
+		color6="$(branch_theme_color "$branch" "tmux_conf_theme_colour_6")"
+		color7="$(branch_theme_color "$branch" "tmux_conf_theme_colour_7")"
+		tail_prefix="$(branch_file_value "$branch" "@omt_status_tail_compact_prefix")"
+		pane_bg="$(branch_theme_value "$branch" "tmux_conf_theme_pane_border_bg")"
+		pane_active_bg="$(branch_theme_value "$branch" "tmux_conf_theme_pane_active_border_bg")"
+
+		if [ "$json" -eq 0 ]; then
+			printf '[%s]\n' "$branch"
+			printf '  mouse=%s\n' "$mouse_on"
+			printf '  tail_expand=%s\n' "$uses_expand"
+			printf '  tail_separator=%s\n' "$uses_separator"
+			printf '  colour_6=%s\n' "${color6:-<none>}"
+			printf '  colour_7=%s\n' "${color7:-<none>}"
+			printf '  pane_border_bg=%s\n' "${pane_bg:-<none>}"
+			printf '  pane_active_border_bg=%s\n' "${pane_active_bg:-<none>}"
+		fi
+
+		[ "$mouse_on" = true ] || failures=$((failures + 1))
+		[ "$uses_expand" = true ] || failures=$((failures + 1))
+		[ "$uses_separator" = true ] || failures=$((failures + 1))
+
+		if [ "$branch" = light ]; then
+			[ "$color6" = "#f5f6f7" ] || failures=$((failures + 1))
+			[ "$color7" = "#4a4a4a" ] || failures=$((failures + 1))
+			printf '%s\n' "$tail_prefix" | rg -q 'bg=#f5f6f7' || failures=$((failures + 1))
+			[ "$pane_bg" = "#fbfbfc" ] || failures=$((failures + 1))
+			[ "$pane_active_bg" = "#fbfbfc" ] || failures=$((failures + 1))
+		elif [ "$branch" = arc-light ] || [ "$branch" = arc-glass-light ]; then
+			[ "$color6" = "#f5f6f7" ] || failures=$((failures + 1))
+			[ "$color7" = "#5c616c" ] || failures=$((failures + 1))
+			printf '%s\n' "$tail_prefix" | rg -q 'bg=#f5f6f7' || failures=$((failures + 1))
+			[ "$pane_bg" = "#fbfbfc" ] || failures=$((failures + 1))
+			[ "$pane_active_bg" = "#fbfbfc" ] || failures=$((failures + 1))
+		fi
+
+		if [ "$json" -eq 1 ]; then
+			results="${results}${results:+,}
+    {\"branch\":\"$branch\",\"mouse\":$mouse_on,\"tail_expand\":$uses_expand,\"tail_separator\":$uses_separator,\"colour_6\":\"$(json_escape "${color6:-}")\",\"colour_7\":\"$(json_escape "${color7:-}")\",\"pane_border_bg\":\"$(json_escape "${pane_bg:-}")\",\"pane_active_border_bg\":\"$(json_escape "${pane_active_bg:-}")\"}"
+		fi
+	done
+
+	if [ "$json" -eq 1 ]; then
+		printf '{\n  "scope":"matrix",\n  "ok": %s,\n  "failures": %s,\n  "branches": [\n%s\n  ]\n}\n' \
+			"$([ "$failures" -eq 0 ] && printf true || printf false)" \
+			"$failures" \
+			"$results"
+		[ "$failures" -eq 0 ]
+		return $?
+	fi
+
+	if [ "$failures" -ne 0 ]; then
+		printf 'verify-matrix=failed count=%s\n' "$failures" >&2
+		return 1
+	fi
+	printf 'verify-matrix=ok\n'
+}
+
+verify_command() {
+	local json=0
+	local matrix=0
+
+	while [ $# -gt 0 ]; do
+		case "$1" in
+		--json) json=1 ;;
+		--matrix) matrix=1 ;;
+		*) die "unknown verify option: $1" ;;
+		esac
+		shift
+	done
+
+	if [ "$matrix" -eq 1 ]; then
+		verify_matrix_command "$json"
+	else
+		verify_current_command "$json"
+	fi
+}
+
+cmd="${1:-}"
+case "$cmd" in
+theme)
+	sub="${2:-}"
+	case "$sub" in
+	list) theme_list ;;
+	current) current_branch ;;
+	set)
+		case "${3:-}" in
+		--force)
+			[ $# -ge 4 ] || die "missing branch"
+			theme_set --force "$4"
+			;;
+		"")
+			die "missing branch"
+			;;
+		*)
+			theme_set "$3"
+			;;
+		esac
+		;;
+	*) usage; exit 1 ;;
+	esac
+	;;
+display)
+	sub="${2:-}"
+	case "$sub" in
+	mode)
+		action="${3:-}"
+		case "$action" in
+		list) display_mode_list ;;
+		get) display_mode_current ;;
+		set) [ $# -ge 4 ] || die "missing mode"; display_mode_set "$4" ;;
+		*) usage; exit 1 ;;
+		esac
+		;;
+	preset)
+		action="${3:-}"
+		case "$action" in
+		list) display_preset_list ;;
+		get) display_preset_current ;;
+		set) [ $# -ge 4 ] || die "missing preset"; display_preset_set "$4" ;;
+		save-default)
+			if [ $# -ge 4 ]; then
+				display_preset_save_default "$4"
+			else
+				display_preset_save_default
+			fi
+			;;
+		reset-default) display_preset_reset_default ;;
+		*) usage; exit 1 ;;
+		esac
+		;;
+	preview)
+		shift 2
+		exec bash "$tmux_perf_dir/render-status.sh" "$@"
+		;;
+	*) usage; exit 1 ;;
+	esac
+	;;
+doctor)
+	shift
+	exec bash "$tmux_perf_dir/doctor.sh" "$@"
+	;;
+verify)
+	shift
+	verify_command "$@"
+	;;
+""|-h|--help)
+	usage
+	;;
+*)
+	usage
+	exit 1
+	;;
+esac
