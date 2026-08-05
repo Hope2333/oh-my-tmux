@@ -36,64 +36,60 @@ omtconfig --help
 
 状态栏内联输入法指示器，用于 kmscon 等无桌面会话的终端 (配合 fcitx5-tmux)。
 
-位置: 默认在 power/prefix 指示器**左边**，`center`/`right` 可选。用原生 tmux user-option `#{@fcitx5}` 渲染，
-由 fcitx5-tmux 代理更新；运行时由 `omt-perf/apply.sh` 的 `patch_status_right` 保留该插值不被覆盖。
+位置: 默认在 power/prefix 指示器**左边**，center/right 可选。用原生 tmux user-option #{@fcitx5} 渲染，
+由 fcitx5-tmux 代理更新；运行时由 omt-perf/apply.sh 的 patch_status_right 保留该插值不被覆盖。
 
 ### 配置项 (.tmux.conf.local)
 
-```
 # 模式 (默认 kmscon-only):
-#   none          —— 禁用，从不加载 fcitx5 插件
-#   kmscon-only   —— 仅当 $TERM 含 "kmscon" 时启用 (默认)
-#   force         —— 任何终端都启用
+#   none          -- 禁用，从不加载 fcitx5 插件
+#   kmscon-only   -- 仅当 $TERM 含 "kmscon" 时启用 (默认)
+#   force         -- 任何终端都启用
 tmux_conf_theme_fcitx5_mode="kmscon-only"
 
 # 指示器位置 (默认 left):
-#   left   —— power/prefix 指示器左侧 (推荐)
-#   center —— prefix 与 power 之间
-#   right  —— 最右侧 (时间之后)
+#   left   -- power/prefix 指示器左侧 (推荐)
+#   center -- prefix 与 power 之间
+#   right  -- 最右侧 (时间之后)
 tmux_conf_theme_fcitx5_position="left"
 
 # 未来扩展预留: 额外状态段 (任选非空即生效)
 # tmux_conf_theme_status_left_extra=""
 # tmux_conf_theme_status_right_extra=""
-```
 
 ### 事实源 (config/)
 
-以 `main` 分支的 `config/fcitx5.tmpl.snippet` 与 `config/fcitx5.local.snippet` 为唯一来源。
-修改事实源后运行 `omtconfig sync --all --commit` 即可注入到全部主题分支。
+以 main 分支的 config/fcitx5.tmpl.snippet 与 config/fcitx5.local.snippet 为唯一来源。
+修改事实源后运行 omtconfig sync --all --commit 即可注入到全部主题分支。
 
 ## omtmux 命令
 
-- `omtmux theme list / current / set [--force] <dark|light|arc-dark|...>` — 主题切换 (git 分支)
-- `omtmux display mode list / get / set <square|rounded|diamond>` — 电池/分隔符号样式
-- `omtmux display preset list / get / set <auto|full|compact|micro>` — 状态栏宽度档位
-- `omtmux display preset save-default / reset-default` — 跨主题保留偏好
-- `omtmux doctor [--width N] [--all-widths] [--json]` — 运行时体检
-- `omtmux verify [--json] [--matrix]` — 断言行检查，--matrix 遍历全部主题分支
+- omtmux theme list / current / set [--force] <dark|light|arc-dark|...> -- 主题切换 (git 分支)
+- omtmux display mode list / get / set <square|rounded|diamond> -- 电池/分隔符号样式
+- omtmux display preset list / get / set <auto|full|compact|micro> -- 状态栏宽度档位
+- omtmux display preset save-default / reset-default -- 跨主题保留偏好
+- omtmux doctor [--width N] [--all-widths] [--json] -- 运行时体检
+- omtmux verify [--json] [--matrix] -- 断言行检查，--matrix 遍历全部主题分支
 
 ## 性能优化 (omt-perf)
 
-- 窗格身份缓存 (username/hostname) — 避免每次状态刷新重复查询
+- 窗格身份缓存 (username/hostname) -- 避免每次状态刷新重复查询
 - 电池指标缓存 (状态/百分比/条) 到 tmux options
 - 低频指标: 电池与 uptime 每 75s 更新
-- 停止默认后台循环; `client-resized` 触发电池条宽度档刷新
+- 停止默认后台循环; client-resized 触发电池条宽度档刷新
 - 亚 80 列切紧凑尾部，亚 64 列切 micro
 
 ## 验证
 
-```bash
 omtconfig doctor
 omtmux verify --matrix
 omtmux doctor --all-widths
-```
 
 ## 多语言文档
 
-- [简体中文](README.zh_Sim.md)
-- [繁體中文](README.zh_Tra.md)
-- [日本語](README.ja.md)
+- 简体中文 (README.zh_Sim.md)
+- 繁體中文 (README.zh_Tra.md)
+- 日本語 (README.ja.md)
 
 ## License
 
