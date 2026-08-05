@@ -17,7 +17,7 @@
 
 set -u
 
-repo_root="$(cd "$(dirname "$0")/.." && pwd)"
+repo_root="$(cd "$(dirname "$0")" && pwd)"
 main_branch="main"
 theme_branches=(arc-dark dark light arc-light arc-glass-dark arc-glass-light lite)
 sync_branch="arc-dark-sync"
