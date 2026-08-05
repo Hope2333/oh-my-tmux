@@ -1,5 +1,5 @@
 #!/bin/bash
-# Oh My Tmux - Lite Edition
+# Oh My Tmux
 # https://github.com/Hope2333/oh-my-tmux
 # (‑●‑●)> dual licensed under the WTFPL v2 license and the MIT license,
 #         without any warranty.
@@ -33,7 +33,7 @@
 	fi
 
 	install() {
-		printf '🎢 Installing Oh My Tmux - Lite Edition. Buckle up!\n' >&2
+		printf '🎢 Installing Oh My Tmux. Buckle up!\n' >&2
 		printf '\n' >&2
 		now=$(date +'%Y%d%m%S')
 
@@ -94,11 +94,11 @@
 
 		printf '\n'
 		OH_MY_TMUX_REPOSITORY=${OH_MY_TMUX_REPOSITORY:-https://github.com/Hope2333/oh-my-tmux.git}
-		OH_MY_TMUX_BRANCH=${OH_MY_TMUX_BRANCH:-lite}
-		printf '⬇️  Cloning Oh My Tmux - Lite Edition (%s branch)...\n' "$OH_MY_TMUX_BRANCH" >&2
+		OH_MY_TMUX_BRANCH=${OH_MY_TMUX_BRANCH:-arc-dark}
+		printf '⬇️  Cloning Oh My Tmux (%s branch)...\n' "$OH_MY_TMUX_BRANCH" >&2
 		if ! is_true "$DRY_RUN"; then
 			mkdir -p "$(dirname "$OH_MY_TMUX_CLONE_PATH")"
-			if ! git clone -q --single-branch --branch "$OH_MY_TMUX_BRANCH" "$OH_MY_TMUX_REPOSITORY" "$OH_MY_TMUX_CLONE_PATH"; then
+			if ! git clone -q --branch "$OH_MY_TMUX_BRANCH" "$OH_MY_TMUX_REPOSITORY" "$OH_MY_TMUX_CLONE_PATH"; then
 				printf '❌ Failed to clone repository\n' >&2 && exit 1
 			fi
 		fi
@@ -129,7 +129,7 @@
 		fi
 
 		printf '\n' >&2
-		printf '🎉 Oh My Tmux - Lite Edition successfully installed 🎉\n' >&2
+		printf '🎉 Oh My Tmux successfully installed 🎉\n' >&2
 		printf '\n' >&2
 		printf '💡 Edit %s to customize your config\n' "${TMUX_CONF_LOCAL/#"$HOME"/'~'}" >&2
 		printf '💡 Press <prefix> + r to reload, <prefix> + e to edit\n' >&2
